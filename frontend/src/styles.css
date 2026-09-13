@@ -44,6 +44,8 @@ main { flex: 1; min-width: 0; padding: 28px 32px 48px; }
 .card__title { margin: 0; font-size: 16px; font-weight: 700; }
 .card__subtitle { margin: 2px 0 0; color: var(--muted); font-size: 13px; max-width: 80ch; }
 .card--nested { box-shadow: none; border: 1px solid var(--line); padding: 14px 16px; margin: 0; }
+.card--nested { overflow-x: auto; }
+.card--nested table.data th, .card--nested table.data td { white-space: normal; padding: 6px 8px; }
 .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
 
 .chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
