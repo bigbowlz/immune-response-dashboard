@@ -48,10 +48,12 @@ export default function App() {
       <main>
         {gate.state === "checking" && <p className="note" aria-live="polite">Connecting to the API…</p>}
         {gate.state === "no-data" && (
-          <Card title="No pipeline output found">
-            <p className="notice-body">{gate.detail}</p>
-            <p>Run <code>make pipeline</code> in the project directory, then reload this page. The pipeline loads <code>cell-count.csv</code> into SQLite and writes every result table the dashboard reads.</p>
-          </Card>
+          <div className="notice">
+            <Card title="No pipeline output found">
+              <p>No pipeline output found. Run <code>make pipeline</code>, then reload.</p>
+              <p>{gate.detail}</p>
+            </Card>
+          </div>
         )}
         {gate.state === "error" && (
           <Card title="The dashboard could not load its data">
