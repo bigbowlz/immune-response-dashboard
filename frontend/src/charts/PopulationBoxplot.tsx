@@ -63,7 +63,7 @@ export function PopulationBoxplot({ population, points, stats, alpha, sharedYMax
     xref: "x",
     y: -0.19,
     yref: "paper",
-    text: `adj. p = ${formatP(r.p_adj)}`,
+    text: r.p_adj < alpha ? `<b>adj. p = ${formatP(r.p_adj)}</b>` : `adj. p = ${formatP(r.p_adj)}`,
     showarrow: false,
     font: { size: 12, color: r.p_adj < alpha ? ACCENT : TEXT, family: "Inter, system-ui, sans-serif" },
     align: "center",

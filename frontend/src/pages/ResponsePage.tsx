@@ -54,7 +54,7 @@ export function ResponsePage() {
     setLoading(true);
     Promise.all([getResponseStats(project, controller.signal), getResponseSamples(project, controller.signal)])
       .then(([s, p]) => { setStats(s.rows); setAlpha(s.alpha); setProjects(s.projects); setPoints(p.points); setError(null); })
-      .catch((e: Error) => { if (e.name !== "AbortError") setError(e.message); })
+      .catch((e: Error) => { if (e.name !== "AbortError") { setStats([]); setPoints([]); setError(e.message); } })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [project]);
