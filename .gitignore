@@ -1,0 +1,9 @@
+# Generated
+*.db
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+frontend/node_modules/
+frontend/dist/
+.vercel/
