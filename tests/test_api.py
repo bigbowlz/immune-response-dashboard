@@ -20,7 +20,7 @@ def test_health(client):
     body = client.get("/api/health").json()
     assert body["status"] == "ok"
     assert body["tables"]["samples"] == 10500
-    assert body["tables"]["response_stats"] == 15
+    assert body["tables"]["response_stats"] == 45
     assert body["db_path"] == "pipeline.db"  # file name only; never the server's absolute path
     assert set(body["meta"]) >= {"generated_at", "csv_sha256"}
 

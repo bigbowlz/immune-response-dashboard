@@ -28,14 +28,8 @@ POPULATION_ORDER = "CASE population WHEN 'b_cell' THEN 0 WHEN 'cd8_t_cell' THEN 
 
 @router.get("/health")
 def health(conn: Conn) -> dict:
-    """Row counts per table plus the provenance written by the last pipeline run.
-
-    response_stats holds one stratum for the whole cohort ('all') plus one per project, so a plain
-    COUNT(*) would mix strata together; report the 'all' stratum's row count, matching the n_tests a
-    caller sees from /api/response/stats?project=all.
-    """
-    tables = {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in RAW_TABLES + RESULT_TABLES if t != "response_stats"}
-    tables["response_stats"] = conn.execute("SELECT COUNT(*) FROM response_stats WHERE project = 'all'").fetchone()[0]
+    """Row counts per table plus the provenance written by the last pipeline run."""
+    tables = {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in RAW_TABLES + RESULT_TABLES}
     meta = dict(conn.execute("SELECT key, value FROM pipeline_meta").fetchall())
     return {"status": "ok", "db_path": resolve_db_path().name, "tables": tables, "meta": meta}
 
