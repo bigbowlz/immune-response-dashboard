@@ -5,11 +5,16 @@ import { POPULATION_LABELS, type Population, type ResponsePoint, type ResponseSt
 
 const Plot = createPlotlyComponent(Plotly);
 
-const FILL = { no: "#7f8ce0", yes: "#4caf7d" } as const;
-const LINE = { no: "#4c5cc7", yes: "#2e7d55" } as const;
+// Colours come from the stylesheet's custom properties so the chart and the rest of the page share one palette.
+function cssVar(name: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+const FILL = { no: cssVar("--nonresponder", "#7f8ce0"), yes: cssVar("--responder", "#4caf7d") } as const;
+const LINE = { no: cssVar("--nonresponder-line", "#4c5cc7"), yes: cssVar("--responder-line", "#2e7d55") } as const;
 const SYMBOL = { no: "circle", yes: "diamond" } as const;
-const TEXT = "#1f2328";
-const ACCENT = "#d6453d";
+const TEXT = cssVar("--text", "#1f2328");
+const ACCENT = cssVar("--accent", "#d6453d");
 
 export function formatP(p: number): string {
   if (p < 0.001) return "< 0.001";
