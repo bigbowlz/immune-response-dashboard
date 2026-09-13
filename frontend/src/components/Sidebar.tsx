@@ -1,0 +1,29 @@
+export type PageKey = "frequencies" | "response" | "subsets";
+
+export const PAGES: Array<{ key: PageKey; label: string }> = [
+  { key: "response", label: "Responder comparison" },
+  { key: "frequencies", label: "Cell frequencies" },
+  { key: "subsets", label: "Cohort subsets" },
+];
+
+export function Sidebar({ active, generatedAt }: { active: PageKey; generatedAt?: string }) {
+  return (
+    <nav className="sidebar" aria-label="Sections">
+      <div className="sidebar__brand"><span className="sidebar__mark" aria-hidden="true" />Immune Response Dashboard</div>
+      <div className="sidebar__section">Analysis</div>
+      {PAGES.map((item) => (
+        <a
+          key={item.key}
+          href={`#/${item.key}`}
+          className={`sidebar__item${item.key === active ? " sidebar__item--active" : ""}`}
+          aria-current={item.key === active ? "page" : undefined}
+        >
+          {item.label}
+        </a>
+      ))}
+      {generatedAt && (
+        <div className="sidebar__footer">Pipeline run {new Date(generatedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</div>
+      )}
+    </nav>
+  );
+}
