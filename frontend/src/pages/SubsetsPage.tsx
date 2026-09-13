@@ -89,7 +89,7 @@ export function SubsetsPage() {
           </div>
         )}
         {data && data.n_samples > 0 && (
-          <div style={{ opacity: loading ? 0.6 : 1, transition: "opacity 120ms ease-out" }} aria-busy={loading}>
+          <div className={loading ? "refreshable refreshable--busy" : "refreshable"} aria-busy={loading}>
             <p className="headline"><span className="metric">{data.n_samples.toLocaleString()}</span> samples from <span className="metric">{data.n_subjects.toLocaleString()}</span> subjects</p>
             <div className="grid">
               <BreakdownCard title="Project" rows={data.breakdowns.project} />
