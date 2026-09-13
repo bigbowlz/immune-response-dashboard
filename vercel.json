@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/**/*.py": { "excludeFiles": "{tests/**,docs/**,frontend/node_modules/**,frontend/src/**,.venv/**,cell-count.csv}" }
+  },
+  "rewrites": [{ "source": "/api/(.*)", "destination": "/api/index" }]
+}
