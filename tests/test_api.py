@@ -156,6 +156,16 @@ def test_missing_db_returns_503(tmp_path, monkeypatch):
     assert "make pipeline" in response.json()["detail"]
 
 
+def test_health_before_pipeline_returns_503(loaded_db_path, monkeypatch):
+    # Raw tables loaded, result tables empty: the loader ran but `make pipeline` never did.
+    monkeypatch.setenv("CELL_COUNTS_DB", str(loaded_db_path))
+    monkeypatch.setenv("SERVE_FRONTEND", "0")
+    from server.app import app
+    response = TestClient(app).get("/api/health")
+    assert response.status_code == 503
+    assert "make pipeline" in response.json()["detail"]
+
+
 def test_api_process_never_imports_dataframe_libraries():
     code = (
         "import sys, server.app, api.index; "

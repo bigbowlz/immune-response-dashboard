@@ -60,6 +60,7 @@ export function FrequenciesPage() {
           onSortChange={(key, d) => { setSort(key as SummaryColumn); setDir(d); setPage(0); }}
           loading={loading}
           emptyText={search ? `No rows match "${search}"` : "No rows. Run make pipeline, then reload."}
+          rowKey={(row) => `${row.sample}-${row.population}`}
           toolbar={
             <>
               <input type="search" placeholder="Search sample or population" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} aria-label="Search sample or population" />

@@ -15,7 +15,7 @@ function BreakdownCard({ title, rows, timepoint }: { title: string; rows: Breakd
     <Card nested title={title}>
       <table className="data">
         <thead>
-          <tr><th>Category</th><th className="num">Samples</th><th className="num">Subjects</th><th className="num">% of Total (by sample)</th></tr>
+          <tr><th scope="col">Category</th><th scope="col" className="num">Samples</th><th scope="col" className="num">Subjects</th><th scope="col" className="num">% of Total (by sample)</th></tr>
         </thead>
         <tbody>
           {rows.map((r) => (

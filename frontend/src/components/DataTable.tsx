@@ -24,10 +24,12 @@ interface Props<T> {
   loading?: boolean;
   emptyText?: string;
   toolbar?: ReactNode;
+  /** Stable row identity for the key prop; falls back to the row's index within the current page. */
+  rowKey?: (row: T, index: number) => string | number;
 }
 
 export function DataTable<T extends object>(props: Props<T>) {
-  const { columns, rows, pageSize = 25, loading = false, emptyText = "No rows", toolbar } = props;
+  const { columns, rows, pageSize = 25, loading = false, emptyText = "No rows", toolbar, rowKey } = props;
   const controlled = props.onPageChange !== undefined;
 
   const [localSortKey, setLocalSortKey] = useState<string | null>(null);
@@ -73,6 +75,7 @@ export function DataTable<T extends object>(props: Props<T>) {
                 return (
                   <th
                     key={c.key}
+                    scope="col"
                     className={`${c.numeric ? "num " : ""}${active ? "sorted" : ""}`}
                     aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                   >
@@ -90,7 +93,7 @@ export function DataTable<T extends object>(props: Props<T>) {
               <tr><td colSpan={columns.length} className="note">{emptyText}</td></tr>
             )}
             {!loading && visible.map((row, i) => (
-              <tr key={i}>
+              <tr key={rowKey ? rowKey(row, i) : i}>
                 {columns.map((c) => {
                   const value = row[c.key];
                   const content = c.render ? c.render(value, row) : c.format ? c.format(value, row) : String(value);

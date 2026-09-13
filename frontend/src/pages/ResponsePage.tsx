@@ -74,8 +74,9 @@ export function ResponsePage() {
     [stats],
   );
   const laterHits = stats.filter((s) => s.time_from_treatment_start !== 0 && s.significant === 1);
-  const nResp = stats[0]?.n_responders;
-  const nNon = stats[0]?.n_nonresponders;
+  const baselineStat = stats.find((s) => s.time_from_treatment_start === 0);
+  const nResp = baselineStat?.n_responders;
+  const nNon = baselineStat?.n_nonresponders;
 
   const columns: ColumnDef<ResponseStat>[] = [
     { key: "population", label: "Population", format: (v) => POPULATION_LABELS[v as ResponseStat["population"]] },
@@ -149,7 +150,7 @@ export function ResponsePage() {
           )}
         </div>
         <p className="note" style={{ marginTop: 12 }}>
-          {nResp !== undefined && `${nResp} responders vs ${nNon} non-responders at each timepoint (${projectLabel}). `}
+          {nResp !== undefined && `${nResp} responders vs ${nNon} non-responders at baseline (${projectLabel}). `}
           Mann-Whitney U per population per timepoint (15 tests), Benjamini-Hochberg adjusted across the 15 tests of the selected project stratum; significant means adjusted p below {alpha}.
           Each subject contributes exactly one sample per timepoint, so the samples within a test are independent; pooling the three timepoints would count each person three times.
           {project === "all" && projects.length > 1 && " Use the project selector to check that the picture holds within each project."}
@@ -157,7 +158,14 @@ export function ResponsePage() {
       </Card>
 
       <Card title="Statistics" subtitle={`One test per population per timepoint, ${projectLabel}. Cliff's delta is positive when responders have the higher frequency.`}>
-        <DataTable columns={columns} rows={stats} pageSize={15} loading={loading} emptyText="No statistics. Run make pipeline, then reload." />
+        <DataTable
+          columns={columns}
+          rows={stats}
+          pageSize={15}
+          loading={loading}
+          emptyText="No statistics. Run make pipeline, then reload."
+          rowKey={(row) => `${row.population}-${row.time_from_treatment_start}`}
+        />
       </Card>
     </>
   );

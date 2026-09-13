@@ -1,7 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd frontend && npm ci",
+  "buildCommand": "cd frontend && npm run build",
+  "outputDirectory": "frontend/dist",
   "functions": {
-    "api/**/*.py": { "excludeFiles": "{tests/**,docs/**,frontend/node_modules/**,frontend/src/**,.venv/**,cell-count.csv}" }
+    "api/**/*.py": { "excludeFiles": "{tests/**,docs/**,frontend/**,frontend/node_modules/**,frontend/src/**,.venv/**,cell-count.csv}" }
   },
   "rewrites": [{ "source": "/api/(.*)", "destination": "/api/index" }]
 }

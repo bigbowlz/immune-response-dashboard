@@ -87,6 +87,28 @@ def test_loader_rejects_inconsistent_subject_metadata(tmp_path):
         load_csv(bad, conn)
 
 
+def test_loader_rejects_duplicate_sample_id(tmp_path):
+    bad = tmp_path / "bad.csv"
+    header = "project,subject,condition,age,sex,treatment,response,sample,sample_type,time_from_treatment_start,b_cell,cd8_t_cell,cd4_t_cell,nk_cell,monocyte\n"
+    bad.write_text(header
+                   + "prj1,sbj0,melanoma,50,M,miraclib,yes,s0,PBMC,0,1,2,3,4,5\n"
+                   + "prj1,sbj1,melanoma,51,F,miraclib,no,s0,PBMC,7,1,2,3,4,5\n")
+    conn = schema.connect(tmp_path / "t.db")
+    schema.create_schema(conn)
+    with pytest.raises(ValueError, match="s0"):
+        load_csv(bad, conn)
+
+
+def test_loader_rejects_invalid_sex(tmp_path):
+    bad = tmp_path / "bad.csv"
+    header = "project,subject,condition,age,sex,treatment,response,sample,sample_type,time_from_treatment_start,b_cell,cd8_t_cell,cd4_t_cell,nk_cell,monocyte\n"
+    bad.write_text(header + "prj1,sbj0,melanoma,50,X,miraclib,yes,s0,PBMC,0,1,2,3,4,5\n")
+    conn = schema.connect(tmp_path / "t.db")
+    schema.create_schema(conn)
+    with pytest.raises((ValueError, sqlite3.IntegrityError)):
+        load_csv(bad, conn)
+
+
 def test_loader_rejects_non_numeric_count(tmp_path):
     bad = tmp_path / "bad.csv"
     header = "project,subject,condition,age,sex,treatment,response,sample,sample_type,time_from_treatment_start,b_cell,cd8_t_cell,cd4_t_cell,nk_cell,monocyte\n"

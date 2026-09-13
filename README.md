@@ -53,7 +53,7 @@ Tests: `.venv/bin/python -m pytest`. Interactive API docs: `http://localhost:800
 - `cell_counts` — one row per sample per population: raw count
 - `sample_summary` — one row per sample per population: count as a percentage of that sample's total
 - `response_stats` — one row per population per day per stratum: Mann-Whitney U, raw and BH-adjusted p, Cliff's delta, significance
-- `cohort_summary` — baseline-cohort sample and subject counts by project, response and sex
+- `cohort_summary` — baseline-cohort sample and subject counts by project, response and sex; a static answer kept for direct SQL inspection, while `/api/subsets` recomputes counts for user-chosen filters
 - `form_answer` — the baseline free-text question and its answer
 - `pipeline_meta` — provenance of the last pipeline run: `generated_at`, `csv_sha256`, `csv_rows`, `python_version`, `pandas_version`, `scipy_version`
 
@@ -70,7 +70,7 @@ Tests: `.venv/bin/python -m pytest`. Interactive API docs: `http://localhost:800
 | `/api/subsets?condition=&treatment=&sample_type=&time_from_treatment_start=` | Sample/subject counts and breakdowns for a filter combination |
 | `/api/form-answer` | The baseline form question and its answer |
 
-**Three requirements files**: `requirements.txt` (fastapi, uvicorn) is API-only because the hosted Python function installs from just this file — the split is a hosting decision, not a doctrine. `requirements-pipeline.txt` (pandas, scipy) is needed only to run the pipeline locally; `requirements-dev.txt` (pytest, httpx) is needed only to run the tests.
+**Three requirements files**: `requirements.txt` (fastapi, uvicorn) is API-only because the hosted Python function installs from just this file — the split is a hosting decision, not a doctrine. `requirements-pipeline.txt` (pandas, scipy) is needed only to run the pipeline locally; `requirements-dev.txt` (pytest, httpx, httpx2) is needed only to run the tests.
 
 The hosted copy serves a `cell_counts.db` committed to the repo; a local run regenerates it, so `make pipeline` modifies that tracked file — expected, not a mistake.
 

@@ -29,8 +29,15 @@ POPULATION_ORDER = "CASE population WHEN 'b_cell' THEN 0 WHEN 'cd8_t_cell' THEN 
 @router.get("/health")
 def health(conn: Conn) -> dict:
     """Row counts per table plus the provenance written by the last pipeline run."""
-    tables = {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in RAW_TABLES + RESULT_TABLES}
-    meta = dict(conn.execute("SELECT key, value FROM pipeline_meta").fetchall())
+    try:
+        tables = {t: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in RAW_TABLES + RESULT_TABLES}
+        meta = dict(conn.execute("SELECT key, value FROM pipeline_meta").fetchall())
+    except sqlite3.OperationalError:
+        # A table RESULT_TABLES expects (e.g. pipeline_meta) is missing: an older database, wrong schema.
+        raise HTTPException(status_code=503, detail="Database schema is out of date. Run make pipeline, then reload.") from None
+    if tables["pipeline_meta"] == 0 or any(tables[t] == 0 for t in RESULT_TABLES):
+        # The pipeline writes pipeline_meta last, so any empty result table means a run never finished.
+        raise HTTPException(status_code=503, detail="Pipeline output is incomplete. Run make pipeline, then reload.")
     return {"status": "ok", "db_path": resolve_db_path().name, "tables": tables, "meta": meta}
 
 
