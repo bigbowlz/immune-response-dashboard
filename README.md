@@ -43,7 +43,7 @@ Tests: `.venv/bin/python -m pytest`. Interactive API docs: `http://localhost:800
 | Layer | Responsibility |
 |---|---|
 | Pipeline (`analysis/`) | Reads the raw tables, runs the statistics, writes the result tables into `cell_counts.db` |
-| API (`server/`) | Reads the result tables over plain SQL; no pandas or scipy in this layer |
+| API (`server/`) | Reads the pipeline's result tables, and for the cohort explorer's user-chosen filters runs COUNT/GROUP BY queries over the raw sample and subject tables; never imports pandas or scipy, never computes a statistic |
 | Frontend (`frontend/`) | Fetches from the API and renders the three pages |
 
 **Schema** — three raw tables plus five result tables in `cell_counts.db`:
@@ -70,7 +70,7 @@ Tests: `.venv/bin/python -m pytest`. Interactive API docs: `http://localhost:800
 | `/api/subsets?condition=&treatment=&sample_type=&time_from_treatment_start=` | Sample/subject counts and breakdowns for a filter combination |
 | `/api/form-answer` | The baseline form question and its answer |
 
-**Two requirements files**: `requirements.txt` (fastapi, uvicorn) is API-only because the hosted Python function installs from just this file — the split is a hosting decision, not a doctrine. `requirements-pipeline.txt` (pandas, scipy) is needed only to run the pipeline locally; `requirements-dev.txt` (pytest, httpx) is needed only to run the tests.
+**Three requirements files**: `requirements.txt` (fastapi, uvicorn) is API-only because the hosted Python function installs from just this file — the split is a hosting decision, not a doctrine. `requirements-pipeline.txt` (pandas, scipy) is needed only to run the pipeline locally; `requirements-dev.txt` (pytest, httpx) is needed only to run the tests.
 
 The hosted copy serves a `cell_counts.db` committed to the repo; a local run regenerates it, so `make pipeline` modifies that tracked file — expected, not a mistake.
 
@@ -116,7 +116,7 @@ The honest result is a null: nothing reaches adjusted p < 0.05. The two smallest
 
 ## Design notes
 
-Before building this I spent time with the kind of platform immunologists already use to review results like these, so this dashboard follows conventions its audience is already comfortable with: population frequencies as per-population boxplots with time on the x-axis and response as the grouping, per-timepoint p-values annotated on the chart, cohort breakdowns as metadata cards showing both sample and subject counts, and summary data as a searchable, exportable table. The point is matching a familiar mental model so results are easy to read and compare, not visual imitation — chart styling and layout here are approximations built with Plotly and React, not a reproduction of any specific product.
+Each view is laid out for the question it answers. Population frequencies are per-population boxplots with time on the x-axis and response as the grouping, so both groups' spread at each day is visible at a glance. Per-timepoint adjusted p-values are annotated directly on the chart, so significance is read together with the plot rather than looked up in a separate table. Cohort breakdowns are metadata cards showing both sample and subject counts, because the two differ once several timepoints are included. Summary data is a searchable, exportable table, for a reader who wants one specific row rather than the whole picture. Built with Plotly and React.
 
 **Where this differs**, and why:
 
