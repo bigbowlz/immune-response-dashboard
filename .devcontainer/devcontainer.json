@@ -1,0 +1,12 @@
+{
+  "name": "immune-response-dashboard",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" }
+  },
+  "postCreateCommand": "make setup",
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": { "label": "Dashboard", "onAutoForward": "openBrowser" }
+  }
+}
