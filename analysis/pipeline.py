@@ -6,6 +6,8 @@ Environment overrides: CELL_COUNTS_DB (database path), CELL_COUNTS_CSV (input us
 from __future__ import annotations
 
 import hashlib
+import itertools
+import math
 import platform
 import sqlite3
 import sys
@@ -24,12 +26,33 @@ except ModuleNotFoundError:  # pragma: no cover - exercised only when make setup
 
 from analysis import cohort, schema, stats
 
+COHORT_DIMENSIONS = ("condition", "treatment", "sample_type", "project")
+FAMILIES = ("all", "0", "7", "14")
+DAYS = (0, 7, 14)
+
+NO_RESPONSES_REASON = "no recorded responses in this cohort"
+
+STATS_COLUMNS = [
+    "condition", "treatment", "sample_type", "project", "timepoints",
+    "population", "time_from_treatment_start", "n_responders", "n_nonresponders",
+    "median_responders", "median_nonresponders", "u_statistic", "p_raw", "p_adj",
+    "effect_size", "significant", "status", "reason",
+]
+STRATA_COLUMNS = [
+    "condition", "treatment", "sample_type", "project", "timepoints",
+    "n_samples", "n_subjects", "n_missing_response", "n_tests",
+]
+POINT_COLUMNS = ["sample", "subject", "project", "population", "time_from_treatment_start", "response", "percentage"]
+
 
 @dataclass(frozen=True)
 class PipelineReport:
     summary_rows: int
     stats_rows: int
-    significant: tuple[tuple[str, str, int], ...]  # (project stratum, population, timepoint)
+    strata: int
+    default_n_tests: int
+    default_min_p_adj: float
+    significant: tuple[tuple[str, str, str, str, str, str, int], ...]  # default-cohort families only
     generated_at: str = ""
 
 
@@ -45,8 +68,11 @@ def _write(conn: sqlite3.Connection, table: str, frame: pd.DataFrame) -> None:
 
 
 def _native(value):
-    """sqlite3 does not accept numpy scalars; convert them to Python numbers."""
-    return value.item() if hasattr(value, "item") else value
+    """sqlite3 does not accept numpy scalars, and a float NaN must become a NULL, not a stored NaN."""
+    value = value.item() if hasattr(value, "item") else value
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    return value
 
 
 def write_sample_summary(conn: sqlite3.Connection) -> int:
@@ -76,22 +102,73 @@ def write_pipeline_meta(conn: sqlite3.Connection, csv_path: Path) -> dict[str, s
     return meta
 
 
-POINT_COLUMNS = ["sample", "subject", "project", "population", "time_from_treatment_start", "response", "percentage"]
+def enumerate_cohort_keys(conn: sqlite3.Connection) -> list[dict]:
+    """Every selectable (condition, treatment, sample_type, project) key: product of {'all'} union
+    each filter's distinct values, in `cohort_options` order. 4 x 4 x 3 x 4 = 192 keys."""
+    options = cohort.cohort_options(conn)
+    axes = [["all", *(str(v) for v in options[dim])] for dim in COHORT_DIMENSIONS]
+    return [dict(zip(COHORT_DIMENSIONS, combo)) for combo in itertools.product(*axes)]
 
 
-def write_response_stats(conn: sqlite3.Connection) -> pd.DataFrame:
-    """One stratum for the whole cohort ('all') plus one per project. BH is applied within each stratum
-    because each stratum is its own family of 15 tests that a reader looks at on its own."""
-    points = pd.DataFrame([dict(r) for r in cohort.response_cohort_points(conn)], columns=POINT_COLUMNS)
-    strata = [("all", points)] + [(project, points[points["project"] == project]) for project in cohort.response_projects(conn)]
-    frames = []
-    for project, subset in strata:
-        result = stats.compare_response_groups(subset)
-        result.insert(0, "project", project)
-        frames.append(result)
-    combined = pd.concat(frames, ignore_index=True)
-    _write(conn, "response_stats", combined)
-    return combined
+def _key_filters(key: dict) -> dict:
+    return {dim: (None if key[dim] == "all" else key[dim]) for dim in COHORT_DIMENSIONS}
+
+
+def _family_frame(key: dict, family: str, cells: pd.DataFrame) -> pd.DataFrame:
+    """`cells` (a full or day-sliced `compare_cells` frame) with BH applied within the family and the
+    cohort key columns attached, ready to append to the combined `response_stats` frame."""
+    adjusted = stats.adjust_family(cells)
+    for dim in COHORT_DIMENSIONS:
+        adjusted[dim] = key[dim]
+    adjusted["timepoints"] = family
+    return adjusted[STATS_COLUMNS]
+
+
+def write_response_stats(conn: sqlite3.Connection) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Precompute every population x timepoint test for every selectable cohort key.
+
+    Raw cells (one Mann-Whitney U per population x timepoint) are computed once per key with
+    `stats.compare_cells`. The four correction families for that key ('all' plus one per timepoint)
+    are then derived from that same frame, each with its own BH pass, never rerunning the U test.
+    """
+    stats_frames: list[pd.DataFrame] = []
+    strata_records: list[dict] = []
+    for key in enumerate_cohort_keys(conn):
+        filters = _key_filters(key)
+        points = pd.DataFrame([dict(r) for r in cohort.response_points(conn, filters)], columns=POINT_COLUMNS)
+        cells = stats.compare_cells(points, DAYS)
+
+        cohort_count = cohort.count_cohort(conn, filters)
+        missing_all = cohort.missing_response_count(conn, filters)
+        if cohort_count["n_samples"] > 0 and missing_all == cohort_count["n_samples"]:
+            cells = cells.copy()
+            cells["reason"] = NO_RESPONSES_REASON
+
+        key_columns = {dim: key[dim] for dim in COHORT_DIMENSIONS}
+        stats_frames.append(_family_frame(key, "all", cells))
+        strata_records.append({
+            **key_columns, "timepoints": "all",
+            "n_samples": cohort_count["n_samples"], "n_subjects": cohort_count["n_subjects"],
+            "n_missing_response": missing_all, "n_tests": stats.family_size(cells),
+        })
+
+        for day in DAYS:
+            day_cells = cells[cells["time_from_treatment_start"] == day].reset_index(drop=True)
+            stats_frames.append(_family_frame(key, str(day), day_cells))
+            day_filters = {**filters, "time_from_treatment_start": day}
+            day_count = cohort.count_cohort(conn, day_filters)
+            strata_records.append({
+                **key_columns, "timepoints": str(day),
+                "n_samples": day_count["n_samples"], "n_subjects": day_count["n_subjects"],
+                "n_missing_response": cohort.missing_response_count(conn, day_filters),
+                "n_tests": stats.family_size(day_cells),
+            })
+
+    stats_combined = pd.concat(stats_frames, ignore_index=True)[STATS_COLUMNS]
+    strata_combined = pd.DataFrame.from_records(strata_records, columns=STRATA_COLUMNS)
+    _write(conn, "response_stats", stats_combined)
+    _write(conn, "response_strata", strata_combined)
+    return stats_combined, strata_combined
 
 
 def write_cohort_summary(conn: sqlite3.Connection) -> None:
@@ -109,16 +186,36 @@ def run(db_path: Path | None = None, csv_path: Path | None = None) -> PipelineRe
     conn = schema.connect(db_path)
     try:
         summary_rows = write_sample_summary(conn)
-        result = write_response_stats(conn)
+        stats_frame, strata_frame = write_response_stats(conn)
         write_cohort_summary(conn)
         meta = write_pipeline_meta(conn, csv_path or schema.resolve_csv_path())
     finally:
         conn.close()
-    significant = tuple(
-        (str(r.project), str(r.population), int(r.time_from_treatment_start))
-        for r in result.itertuples() if r.significant
+
+    default_mask = (
+        (stats_frame["condition"] == cohort.DEFAULT_COHORT["condition"])
+        & (stats_frame["treatment"] == cohort.DEFAULT_COHORT["treatment"])
+        & (stats_frame["sample_type"] == cohort.DEFAULT_COHORT["sample_type"])
+        & (stats_frame["project"] == "all")
     )
-    return PipelineReport(summary_rows, len(result), significant, meta["generated_at"])
+    default_rows = stats_frame[default_mask]
+    default_all = default_rows[default_rows["timepoints"] == "all"]
+    default_ok = default_all[default_all["status"] == "ok"]
+    default_n_tests = int(len(default_ok))
+    default_min_p_adj = float(default_ok["p_adj"].min())
+    significant = tuple(
+        (r.condition, r.treatment, r.sample_type, r.project, r.timepoints, r.population, int(r.time_from_treatment_start))
+        for r in default_rows.itertuples() if r.significant
+    )
+    return PipelineReport(
+        summary_rows=summary_rows,
+        stats_rows=len(stats_frame),
+        strata=len(strata_frame),
+        default_n_tests=default_n_tests,
+        default_min_p_adj=default_min_p_adj,
+        significant=significant,
+        generated_at=meta["generated_at"],
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -133,12 +230,18 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     report = run(db_path)
     print(f"sample_summary: {report.summary_rows} rows")
-    print(f"response_stats: {report.stats_rows} tests (Mann-Whitney U per population per timepoint, BH-adjusted within each project stratum)")
     if report.significant:
-        for project, population, day in report.significant:
-            print(f"  significant at adjusted p < {stats.ALPHA}: {population} at day {day} (project {project})")
+        for condition, treatment, sample_type, project, timepoints, population, day in report.significant:
+            print(
+                f"  significant at adjusted p < {stats.ALPHA}: {population} at day {day} "
+                f"({condition}/{treatment}/{sample_type}/{project}, family {timepoints})"
+            )
     else:
-        print(f"  no population reaches adjusted p < {stats.ALPHA} in any stratum")
+        print(f"  default cohort: no population reaches adjusted p < {stats.ALPHA} in any family")
+    print(
+        f"response_stats: {report.stats_rows} rows over {report.strata} strata; "
+        f"default cohort: {report.default_n_tests} tests, smallest adjusted p {report.default_min_p_adj:.3f}"
+    )
     return 0
 
 

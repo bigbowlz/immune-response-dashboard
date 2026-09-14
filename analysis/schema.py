@@ -12,7 +12,7 @@ CSV_PATH = ROOT / "cell-count.csv"
 POPULATIONS: tuple[str, ...] = ("b_cell", "cd8_t_cell", "cd4_t_cell", "nk_cell", "monocyte")
 
 RAW_TABLES = ("subjects", "samples", "cell_counts")
-RESULT_TABLES = ("sample_summary", "response_stats", "cohort_summary", "pipeline_meta")
+RESULT_TABLES = ("sample_summary", "response_stats", "response_strata", "cohort_summary", "pipeline_meta")
 
 SCHEMA_SQL = """
 CREATE TABLE subjects (
@@ -50,20 +50,44 @@ CREATE TABLE sample_summary (
     PRIMARY KEY (sample, population)
 );
 
+-- One row per selectable cohort key (condition, treatment, sample_type, project, each 'all' or a
+-- value) x correction family (timepoints: 'all', '0', '7', '14') x population x timepoint.
+-- Statistics are NULL and status is 'unavailable' when the cell could not be tested; see `reason`.
 CREATE TABLE response_stats (
-    project                   TEXT NOT NULL,   -- 'all' for the whole cohort, else a project id (stratified run)
+    condition                 TEXT NOT NULL,   -- 'all' or a value
+    treatment                 TEXT NOT NULL,   -- 'all' or a value
+    sample_type               TEXT NOT NULL,   -- 'all' or a value
+    project                   TEXT NOT NULL,   -- 'all' or a value
+    timepoints                TEXT NOT NULL,   -- correction family: 'all', '0', '7', '14'
     population                TEXT NOT NULL,
     time_from_treatment_start INTEGER NOT NULL,
     n_responders              INTEGER NOT NULL,
     n_nonresponders           INTEGER NOT NULL,
-    median_responders         REAL NOT NULL,
-    median_nonresponders      REAL NOT NULL,
-    u_statistic               REAL NOT NULL,
-    p_raw                     REAL NOT NULL,
-    p_adj                     REAL NOT NULL,
-    effect_size               REAL NOT NULL,
+    median_responders         REAL,
+    median_nonresponders      REAL,
+    u_statistic               REAL,
+    p_raw                     REAL,
+    p_adj                     REAL,
+    effect_size               REAL,
     significant               INTEGER NOT NULL CHECK (significant IN (0, 1)),
-    PRIMARY KEY (project, population, time_from_treatment_start)
+    status                    TEXT NOT NULL CHECK (status IN ('ok', 'unavailable')),
+    reason                    TEXT,
+    PRIMARY KEY (condition, treatment, sample_type, project, timepoints, population, time_from_treatment_start)
+);
+
+-- One row per selectable cohort key x correction family, so the API can read a stratum's
+-- sample/subject/missing-response counts and its family size without recomputing them.
+CREATE TABLE response_strata (
+    condition          TEXT NOT NULL,
+    treatment          TEXT NOT NULL,
+    sample_type        TEXT NOT NULL,
+    project            TEXT NOT NULL,
+    timepoints         TEXT NOT NULL,
+    n_samples          INTEGER NOT NULL,
+    n_subjects         INTEGER NOT NULL,
+    n_missing_response INTEGER NOT NULL,
+    n_tests            INTEGER NOT NULL,
+    PRIMARY KEY (condition, treatment, sample_type, project, timepoints)
 );
 
 CREATE TABLE cohort_summary (
