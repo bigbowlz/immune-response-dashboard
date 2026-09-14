@@ -1,0 +1,318 @@
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { cohortSamplesCsvUrl, getCohortOptions, getCohortPoints, getCohortSamples, getCohortStats, getCohortSummary } from "../api";
+import { PopulationBoxplot, dayLabel, formatDelta, formatP } from "../charts/PopulationBoxplot";
+import { BreakdownCard } from "../components/BreakdownCard";
+import { Card } from "../components/Card";
+import { Chip } from "../components/Chip";
+import { CohortFilterCard } from "../components/CohortFilterCard";
+import { DataTable, type ColumnDef, type SortDir } from "../components/DataTable";
+import { PageHeader } from "../components/PageHeader";
+import {
+  POPULATIONS, POPULATION_LABELS,
+  type CohortFilters, type CohortOptions, type CohortPoint, type CohortStat, type CohortStatsResponse,
+  type CohortSummary, type Population, type SampleColumn, type SampleRow,
+} from "../types";
+
+const DEFAULT_FILTERS: CohortFilters = {
+  condition: "melanoma", treatment: "miraclib", sample_type: "PBMC", project: "all", time_from_treatment_start: "all",
+};
+const PAGE_SIZE = 50;
+const DEFAULT_TABLE = { sort: "sample" as SampleColumn, dir: "asc" as SortDir, page: 0 };
+
+const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const populationLabel = (s: CohortStat) => POPULATION_LABELS[s.population];
+const direction = (delta: number) => (delta >= 0 ? "higher" : "lower");
+
+/** Plain-language description of the selected cohort, used in the explanatory copy. */
+function cohortDescription(f: CohortFilters): string {
+  const subjects = f.condition === "healthy" && f.treatment === "none"
+    ? "healthy subjects (no treatment)"
+    : `${f.condition === "all" ? "all conditions" : f.condition} patients treated with ${f.treatment === "all" ? "all treatments" : f.treatment === "none" ? "no treatment" : f.treatment}`;
+  const sampleType = f.sample_type === "all" ? "all sample types" : f.sample_type;
+  const project = f.project === "all" ? "all projects" : `project ${f.project}`;
+  return capitalise(`${subjects}, ${sampleType} samples, ${project}`);
+}
+
+/** One sentence that holds whether or not anything is significant, and names the reason when nothing ran. */
+function headline(rows: CohortStat[], alpha: number): ReactNode {
+  const ok = rows.filter((r) => r.status === "ok" && r.effect_size !== null && r.p_adj !== null);
+  if (ok.length === 0) {
+    const reason = rows.find((r) => r.reason)?.reason ?? "no comparable samples";
+    return <>No response comparison is available for this cohort: {reason}.</>;
+  }
+  const earliest = Math.min(...ok.map((r) => r.time_from_treatment_start));
+  const ranked = ok
+    .filter((r) => r.time_from_treatment_start === earliest)
+    .sort((a, b) => Math.abs(b.effect_size!) - Math.abs(a.effect_size!));
+  const top = ranked[0];
+  const hits = ok.filter((r) => r.significant === 1).sort((a, b) => Math.abs(b.effect_size!) - Math.abs(a.effect_size!));
+  return (
+    <>
+      At {dayLabel(earliest).toLowerCase()}, the largest difference between responders and non-responders is{" "}
+      <strong>{populationLabel(top)}</strong> ({direction(top.effect_size!)} in responders, Cliff's delta {formatDelta(top.effect_size!)}, adjusted p {formatP(top.p_adj!)}).{" "}
+      {hits.length === 0
+        ? <>No test in this cohort has an adjusted p below {alpha}.</>
+        : <>{hits.length === 1 ? "One test" : `${hits.length} tests`} in this cohort {hits.length === 1 ? "has" : "have"} an adjusted p below {alpha}: {hits.map((r) => `${populationLabel(r)} at ${dayLabel(r.time_from_treatment_start).toLowerCase()}`).join(", ")}.</>}
+    </>
+  );
+}
+
+/** The note that keeps baseline associations and post-treatment differences apart. */
+function interpretationNote(days: number[]): string {
+  const hasBaseline = days.includes(0);
+  const later = days.filter((d) => d !== 0);
+  const parts: string[] = [];
+  if (hasBaseline) parts.push("Day 0 samples are taken before treatment, so a day 0 difference is an association with the response recorded later, not evidence that the population predicts it.");
+  if (later.length > 0) parts.push(`${later.map((d) => `Day ${d}`).join(" and ")} samples are taken after treatment started, so a difference there describes the two response groups as they already differ, and does not by itself show prediction or that the treatment caused the difference.`);
+  return parts.join(" ");
+}
+
+const STAT_COLUMNS = (alpha: number): ColumnDef<CohortStat>[] => [
+  { key: "population", label: "Population", format: (v) => POPULATION_LABELS[v as Population] },
+  { key: "time_from_treatment_start", label: "Day", numeric: true },
+  { key: "n_responders", label: "n resp.", numeric: true, format: (v) => Number(v).toLocaleString() },
+  { key: "n_nonresponders", label: "n non-resp.", numeric: true, format: (v) => Number(v).toLocaleString() },
+  { key: "median_responders", label: "Median resp. (%)", numeric: true, format: (v) => (v === null ? "—" : Number(v).toFixed(2)) },
+  { key: "median_nonresponders", label: "Median non-resp. (%)", numeric: true, format: (v) => (v === null ? "—" : Number(v).toFixed(2)) },
+  { key: "u_statistic", label: "U", numeric: true, format: (v) => (v === null ? "—" : Number(v).toLocaleString()) },
+  // An unavailable cell has no p-values: the reason takes their place.
+  { key: "p_raw", label: "p (raw)", numeric: true, render: (v, row) => (row.status === "ok" && v !== null ? formatP(Number(v)) : <span className="reason">{row.reason}</span>) },
+  { key: "p_adj", label: "p (BH-adjusted)", numeric: true, render: (v, row) => (row.status === "ok" && v !== null ? <span className={Number(v) < alpha ? "sig" : undefined}>{formatP(Number(v))}</span> : "") },
+  { key: "effect_size", label: "Cliff's delta", numeric: true, format: (v) => (v === null ? "—" : formatDelta(Number(v))) },
+  {
+    key: "status",
+    label: "Status",
+    render: (_v, row) =>
+      row.status === "unavailable"
+        ? <Chip tone="neutral">Unavailable</Chip>
+        : <Chip tone={row.significant === 1 ? "green" : "neutral"}>{row.significant === 1 ? "Significant" : "n.s."}</Chip>,
+  },
+];
+
+const SAMPLE_COLUMNS: ColumnDef<SampleRow>[] = [
+  { key: "sample", label: "sample" },
+  { key: "subject", label: "subject" },
+  { key: "project", label: "project" },
+  { key: "condition", label: "condition" },
+  { key: "treatment", label: "treatment" },
+  { key: "sample_type", label: "sample_type" },
+  { key: "time_from_treatment_start", label: "time_from_treatment_start", numeric: true },
+  { key: "response", label: "response", format: (v) => (v === null ? "—" : String(v)) },
+  { key: "sex", label: "sex" },
+];
+
+export function CohortPage() {
+  const [options, setOptions] = useState<CohortOptions | null>(null);
+  const [filters, setFilters] = useState<CohortFilters>(DEFAULT_FILTERS);
+
+  const [summary, setSummary] = useState<CohortSummary | null>(null);
+  const [stats, setStats] = useState<CohortStatsResponse | null>(null);
+  const [points, setPoints] = useState<CohortPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [table, setTable] = useState(DEFAULT_TABLE);
+  const [samples, setSamples] = useState<SampleRow[]>([]);
+  const [samplesTotal, setSamplesTotal] = useState(0);
+  const [samplesLoading, setSamplesLoading] = useState(true);
+  // The cohort fetch below already loads the first samples page, so the samples-only effect stands
+  // down for the render that follows a filter change (and for the first render).
+  const samplesHandled = useRef(true);
+
+  useEffect(() => {
+    getCohortOptions().then(setOptions).catch((e: Error) => setError(e.message));
+  }, []);
+
+  // One controller per filter change covering summary, stats, points and the first samples page:
+  // a superseded response is aborted and never reaches the state.
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setSamplesLoading(true);
+    Promise.all([
+      getCohortSummary(filters, controller.signal),
+      getCohortStats(filters, controller.signal),
+      getCohortPoints(filters, controller.signal),
+      getCohortSamples(filters, { ...DEFAULT_TABLE, limit: PAGE_SIZE, offset: 0 }, controller.signal),
+    ])
+      .then(([s, st, p, rows]) => {
+        if (controller.signal.aborted) return;
+        setSummary(s); setStats(st); setPoints(p.points);
+        setSamples(rows.rows); setSamplesTotal(rows.total);
+        setError(null);
+      })
+      .catch((e: Error) => {
+        if (e.name === "AbortError") return;
+        setSummary(null); setStats(null); setPoints([]); setSamples([]); setSamplesTotal(0);
+        setError(e.message);
+      })
+      .finally(() => {
+        if (controller.signal.aborted) return;
+        setLoading(false); setSamplesLoading(false);
+      });
+    return () => controller.abort();
+  }, [filters]);
+
+  // Sorting and paging re-fetch the samples list alone, under their own controller.
+  useEffect(() => {
+    if (samplesHandled.current) { samplesHandled.current = false; return; }
+    const controller = new AbortController();
+    setSamplesLoading(true);
+    getCohortSamples(filters, { sort: table.sort, dir: table.dir, limit: PAGE_SIZE, offset: table.page * PAGE_SIZE }, controller.signal)
+      .then((r) => { setSamples(r.rows); setSamplesTotal(r.total); setError(null); })
+      .catch((e: Error) => { if (e.name !== "AbortError") setError(e.message); })
+      .finally(() => { if (!controller.signal.aborted) setSamplesLoading(false); });
+    return () => controller.abort();
+  }, [filters, table]);
+
+  const applyFilters = (next: CohortFilters) => {
+    samplesHandled.current = true;
+    setTable(DEFAULT_TABLE);
+    setFilters(next);
+  };
+
+  const rows = stats?.rows ?? [];
+  const days = useMemo(() => [...new Set(rows.map((r) => r.time_from_treatment_start))].sort((a, b) => a - b), [rows]);
+  const byPopulation = useMemo(() => {
+    const map = new Map<Population, CohortPoint[]>();
+    for (const p of points) map.set(p.population, [...(map.get(p.population) ?? []), p]);
+    return map;
+  }, [points]);
+  const alpha = stats?.alpha ?? 0.05;
+  const nUnavailable = rows.filter((r) => r.status === "unavailable").length;
+  const empty = !loading && summary !== null && summary.n_samples === 0;
+  const description = cohortDescription(filters);
+
+  return (
+    <>
+      <PageHeader
+        title="Cohort analysis"
+        subtitle="Explore immune cell frequencies and compare treatment response within a selected cohort."
+      />
+      {error && <Card><p className="error">{error}</p></Card>}
+
+      <CohortFilterCard
+        filters={filters}
+        options={options}
+        onChange={applyFilters}
+        onBaseline={() => applyFilters({ ...filters, time_from_treatment_start: "0" })}
+        onReset={() => applyFilters(DEFAULT_FILTERS)}
+      />
+
+      {empty ? (
+        <Card title="Key metadata distribution">
+          <div className="empty" aria-live="polite">
+            <span>No samples match these filters.</span>
+            <button type="button" className="button" onClick={() => applyFilters(DEFAULT_FILTERS)}>Reset to default cohort</button>
+          </div>
+        </Card>
+      ) : (
+        <>
+          <Card title="Key metadata distribution" subtitle={description}>
+            {loading || !summary ? (
+              <div className="skeleton skeleton--block" aria-hidden="true" />
+            ) : (
+              <>
+                <p className="headline">
+                  <span><span className="metric">{summary.n_samples.toLocaleString()}</span> samples</span>
+                  <span>from <span className="metric">{summary.n_subjects.toLocaleString()}</span> subjects</span>
+                </p>
+                <div className="grid">
+                  <BreakdownCard title="Project" rows={summary.breakdowns.project} />
+                  <BreakdownCard title="Response" rows={summary.breakdowns.response} />
+                  <BreakdownCard title="Sex" rows={summary.breakdowns.sex} />
+                  {filters.time_from_treatment_start === "all" && (
+                    <BreakdownCard title="Timepoint" rows={summary.breakdowns.time_from_treatment_start} timepoint />
+                  )}
+                </div>
+              </>
+            )}
+          </Card>
+
+          <Card
+            title="Population frequencies by response"
+            subtitle="Boxes: non-responder (blue, circles) and responder (green, diamonds) at each selected timepoint; points are individual samples; the adjusted p for each test sits under its day."
+          >
+            {loading || !stats ? (
+              <div className="charts">
+                {POPULATIONS.map((population) => <div key={population} className="skeleton" aria-hidden="true" />)}
+              </div>
+            ) : (
+              <>
+                <p className="result">{headline(rows, alpha)}</p>
+                <div className="charts">
+                  {POPULATIONS.map((population) => {
+                    const own = rows.filter((r) => r.population === population);
+                    const usable = own.filter((r) => r.status === "ok");
+                    if (usable.length === 0) {
+                      return (
+                        <div key={population} className="chart-panel chart-panel--empty">
+                          <h3 className="chart-panel__title">{POPULATION_LABELS[population]}</h3>
+                          <p className="note">No comparison at the selected timepoints: {own.find((r) => r.reason)?.reason ?? "no comparable samples"}.</p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <PopulationBoxplot
+                        key={population}
+                        population={population}
+                        points={byPopulation.get(population) ?? []}
+                        stats={rows}
+                        timepoints={days}
+                        alpha={alpha}
+                      />
+                    );
+                  })}
+                </div>
+                <p className="note" style={{ marginTop: 12 }}>
+                  {description}. The y axis is percent of total (five populations).{" "}
+                  {summary && (summary.n_missing_response > 0
+                    ? `${summary.n_missing_response.toLocaleString()} of ${summary.n_samples.toLocaleString()} matching samples are excluded from the comparison because no response is recorded for their subject.`
+                    : "No matching sample is excluded: every subject in this cohort has a recorded response.")}
+                </p>
+                <p className="note" style={{ marginTop: 8 }}>{interpretationNote(days)}</p>
+              </>
+            )}
+          </Card>
+
+          <Card
+            title="Statistics"
+            subtitle="One two-sided Mann-Whitney U test per population per selected timepoint, responders against non-responders. Cliff's delta is positive when responders have the higher frequency."
+          >
+            <DataTable
+              columns={STAT_COLUMNS(alpha)}
+              rows={rows}
+              pageSize={rows.length || 15}
+              loading={loading}
+              emptyText="No statistics for this cohort."
+              rowKey={(row) => `${row.population}-${row.time_from_treatment_start}`}
+            />
+            {stats && (
+              <p className="note" style={{ marginTop: 10 }}>
+                Benjamini–Hochberg across the {stats.n_tests.toLocaleString()} valid {stats.n_tests === 1 ? "test" : "tests"} in this cohort ({nUnavailable.toLocaleString()} unavailable). Significant means adjusted p below {alpha}.
+              </p>
+            )}
+          </Card>
+
+          <Card title="Matching samples" subtitle="Every sample in the selected cohort. Sorting, paging and the export cover all matching rows, not just the page shown.">
+            <DataTable
+              columns={SAMPLE_COLUMNS}
+              rows={samples}
+              pageSize={PAGE_SIZE}
+              total={samplesTotal}
+              page={table.page}
+              onPageChange={(page) => setTable((t) => ({ ...t, page }))}
+              sortKey={table.sort}
+              sortDir={table.dir}
+              onSortChange={(key, dir) => setTable({ sort: key as SampleColumn, dir, page: 0 })}
+              loading={samplesLoading}
+              emptyText="No samples match these filters."
+              rowKey={(row) => row.sample}
+              toolbar={<a className="button" href={cohortSamplesCsvUrl(filters, table.sort, table.dir)} download>Export CSV</a>}
+            />
+          </Card>
+        </>
+      )}
+    </>
+  );
+}

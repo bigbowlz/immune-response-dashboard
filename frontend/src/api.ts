@@ -1,6 +1,8 @@
 import type {
-  FrequencyQuery, Health, ResponseSamplesResponse, ResponseStatsResponse, SubsetFilters, SubsetOptions, SubsetsResponse, SummaryResponse,
+  CohortFilters, CohortOptions, CohortPointsResponse, CohortStatsResponse, CohortSummary,
+  FrequencyQuery, Health, SampleColumn, SamplesResponse, SummaryResponse,
 } from "./types";
+import type { SortDir } from "./components/DataTable";
 
 /** Thrown for any non-2xx response. `detail` is the API's own message when it sent one (e.g. "Run make pipeline first"). */
 export class ApiError extends Error {
@@ -29,7 +31,14 @@ const query = (params: Record<string, string | number | undefined>) => {
 export const getHealth = () => getJson<Health>("/api/health");
 export const getFrequencies = (q: FrequencyQuery, signal?: AbortSignal) => getJson<SummaryResponse>(`/api/frequencies${query(q)}`, signal);
 export const frequenciesCsvUrl = (q: FrequencyQuery) => `/api/frequencies.csv${query({ search: q.search, sort: q.sort, dir: q.dir })}`;
-export const getResponseStats = (project = "all", signal?: AbortSignal) => getJson<ResponseStatsResponse>(`/api/response/stats${query({ project })}`, signal);
-export const getResponseSamples = (project = "all", signal?: AbortSignal) => getJson<ResponseSamplesResponse>(`/api/response/samples${query({ project })}`, signal);
-export const getSubsetOptions = () => getJson<SubsetOptions>("/api/subsets/options");
-export const getSubsets = (filters: SubsetFilters, signal?: AbortSignal) => getJson<SubsetsResponse>(`/api/subsets${query(filters)}`, signal);
+
+export interface SamplePage { sort: SampleColumn; dir: SortDir; limit: number; offset: number }
+
+export const getCohortOptions = () => getJson<CohortOptions>("/api/cohort/options");
+export const getCohortSummary = (f: CohortFilters, signal?: AbortSignal) => getJson<CohortSummary>(`/api/cohort/summary${query(f)}`, signal);
+export const getCohortStats = (f: CohortFilters, signal?: AbortSignal) => getJson<CohortStatsResponse>(`/api/cohort/stats${query(f)}`, signal);
+export const getCohortPoints = (f: CohortFilters, signal?: AbortSignal) => getJson<CohortPointsResponse>(`/api/cohort/points${query(f)}`, signal);
+export const getCohortSamples = (f: CohortFilters, page: SamplePage, signal?: AbortSignal) =>
+  getJson<SamplesResponse>(`/api/cohort/samples${query({ ...f, ...page })}`, signal);
+export const cohortSamplesCsvUrl = (f: CohortFilters, sort: SampleColumn, dir: SortDir) =>
+  `/api/cohort/samples.csv${query({ ...f, sort, dir })}`;

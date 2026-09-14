@@ -1,9 +1,8 @@
-export type PageKey = "frequencies" | "response" | "subsets";
+export type PageKey = "cohort" | "frequencies";
 
 export const PAGES: Array<{ key: PageKey; label: string }> = [
-  { key: "response", label: "Responder comparison" },
+  { key: "cohort", label: "Cohort analysis" },
   { key: "frequencies", label: "Cell frequencies" },
-  { key: "subsets", label: "Cohort subsets" },
 ];
 
 export function Sidebar({ active, generatedAt }: { active: PageKey; generatedAt?: string }) {

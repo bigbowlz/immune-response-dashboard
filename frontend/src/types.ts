@@ -27,23 +27,56 @@ export interface Health {
   meta: Partial<Record<"generated_at" | "csv_sha256" | "csv_rows" | "python_version" | "pandas_version" | "scipy_version", string>>;
 }
 
-export interface ResponseStat {
-  project: string; // "all" or a project id
+/** The five selectors that define a cohort. The API takes each as "all" or one of the data's values. */
+export type CohortFilterKey = "condition" | "treatment" | "sample_type" | "project" | "time_from_treatment_start";
+export type CohortFilters = Record<CohortFilterKey, string>; // always strings in the UI, "all" included
+export type CohortOptions = Record<CohortFilterKey, Array<string | number>>;
+
+export interface BreakdownRow { category: string | number; n_samples: number; n_subjects: number; pct_samples: number }
+export type BreakdownKey = "project" | "response" | "sex" | "time_from_treatment_start";
+
+export interface CohortSummary {
+  filters: CohortFilters;
+  n_samples: number;
+  n_subjects: number;
+  n_missing_response: number;
+  breakdowns: Record<BreakdownKey, BreakdownRow[]>;
+}
+
+/** One population x timepoint cell. Every statistic is null when `status` is "unavailable". */
+export interface CohortStat {
+  condition: string;
+  treatment: string;
+  sample_type: string;
+  project: string;
+  timepoints: string;
   population: Population;
   time_from_treatment_start: number;
   n_responders: number;
   n_nonresponders: number;
-  median_responders: number;
-  median_nonresponders: number;
-  u_statistic: number;
-  p_raw: number;
-  p_adj: number;
-  effect_size: number;
+  median_responders: number | null;
+  median_nonresponders: number | null;
+  u_statistic: number | null;
+  p_raw: number | null;
+  p_adj: number | null;
+  effect_size: number | null;
   significant: 0 | 1;
+  status: "ok" | "unavailable";
+  reason: string | null;
 }
-export interface ResponseStatsResponse { rows: ResponseStat[]; alpha: number; n_tests: number; project: string; projects: string[] }
 
-export interface ResponsePoint {
+export interface CohortStatsResponse {
+  filters: CohortFilters;
+  family: string;
+  rows: CohortStat[];
+  alpha: number;
+  n_tests: number;
+  n_samples: number;
+  n_subjects: number;
+  n_missing_response: number;
+}
+
+export interface CohortPoint {
   sample: string;
   subject: string;
   project: string;
@@ -52,16 +85,18 @@ export interface ResponsePoint {
   response: "yes" | "no";
   percentage: number;
 }
-export interface ResponseSamplesResponse { points: ResponsePoint[] }
+export interface CohortPointsResponse { points: CohortPoint[] }
 
-export interface BreakdownRow { category: string | number; n_samples: number; n_subjects: number; pct_samples: number }
-export type FilterKey = "condition" | "treatment" | "sample_type" | "time_from_treatment_start";
-export type SubsetFilters = Record<FilterKey, string>; // "all" or a value, always strings in the UI
-export interface SubsetsResponse {
-  filters: Record<FilterKey, string | number | null>;
-  n_samples: number;
-  n_subjects: number;
-  breakdowns: Record<"project" | "response" | "sex" | "time_from_treatment_start", BreakdownRow[]>;
+export interface SampleRow {
+  sample: string;
+  subject: string;
+  project: string;
+  condition: string;
+  treatment: string;
+  sample_type: string;
+  time_from_treatment_start: number;
+  response: string | null;
+  sex: string;
 }
-export type SubsetOptions = Record<FilterKey, Array<string | number>>;
-
+export type SampleColumn = keyof SampleRow;
+export interface SamplesResponse { rows: SampleRow[]; total: number; limit: number; offset: number }

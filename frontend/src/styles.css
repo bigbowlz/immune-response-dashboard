@@ -83,6 +83,26 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
 .notice { max-width: 560px; margin: 80px auto; }
 .notice code { background: #eef0f3; padding: 2px 6px; border-radius: 4px; }
 
+/* Cohort filter card: a plain-text crumb line above outlined selects whose label sits on the top border. */
+.filter-card { display: flex; flex-direction: column; gap: 18px; }
+.crumbs { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; font-size: 13px; }
+.crumb__label { color: var(--muted); }
+.crumb__value { color: var(--accent); font-weight: 600; }
+.crumb__sep { color: var(--muted); margin: 0 8px; }
+.fields { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.field { position: relative; }
+.field select { border: 1px solid var(--line); border-radius: var(--radius-control); min-height: 40px; padding: 10px 32px 8px 12px; background: #fff; min-width: 160px; width: 100%; }
+.field__label { position: absolute; top: -7px; left: 10px; background: #fff; padding: 0 4px; font-size: 12px; color: var(--muted); }
+.field-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.field-actions .button[disabled] { opacity: 0.5; cursor: default; }
+
+.reason { display: inline-block; white-space: normal; text-align: left; color: var(--muted); max-width: 30ch; }
+table.data td .sig { color: var(--accent); font-weight: 600; }
+.chart-panel__title { margin: 4px 8px 6px; font-size: 14px; font-weight: 600; }
+.chart-panel--empty { display: flex; flex-direction: column; justify-content: center; min-height: 200px; padding: 16px; }
+.chart-panel--empty .note { margin: 0 8px; }
+.skeleton--block { height: 180px; }
+
 .charts { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
 .chart-panel { border: 1px solid var(--line); border-radius: var(--radius-panel); padding: 8px 4px 0; }
 .chart-panel--hit { border-color: var(--accent); }
@@ -98,5 +118,7 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
   .sidebar__footer { display: none; }
   main { padding: 20px 16px; }
   .charts { grid-template-columns: 1fr; }
+  .crumb__sep { margin: 0 4px; }
+  .field, .field select, .field-actions, .field-actions .button { width: 100%; }
   .page-header h1 { font-size: 22px; }
 }

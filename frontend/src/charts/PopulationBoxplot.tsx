@@ -1,7 +1,7 @@
 import Plotly from "plotly.js-cartesian-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
 import type { Annotation, Data, Layout } from "plotly.js";
-import { POPULATION_LABELS, type Population, type ResponsePoint, type ResponseStat } from "../types";
+import { POPULATION_LABELS, type CohortPoint, type CohortStat, type Population } from "../types";
 
 const Plot = createPlotlyComponent(Plotly);
 
@@ -16,6 +16,7 @@ function readPalette() {
     FILL: { no: cssVar("--nonresponder", "#7f8ce0"), yes: cssVar("--responder", "#4caf7d") } as const,
     LINE: { no: cssVar("--nonresponder-line", "#4c5cc7"), yes: cssVar("--responder-line", "#2e7d55") } as const,
     TEXT: cssVar("--text", "#1f2328"),
+    MUTED: cssVar("--muted", "#5f6672"),
     ACCENT: cssVar("--accent", "#d6453d"),
   };
 }
@@ -34,21 +35,25 @@ export const dayLabel = (day: number) => (day === 0 ? "Day 0 (baseline)" : `Day 
 
 interface Props {
   population: Population;
-  points: ResponsePoint[];
-  stats: ResponseStat[];
+  points: CohortPoint[];
+  stats: CohortStat[];
+  /** The selected timepoints, in the order they appear on the x-axis. */
+  timepoints: number[];
   alpha: number;
   sharedYMax?: number;
 }
 
-export function PopulationBoxplot({ population, points, stats, alpha, sharedYMax }: Props) {
-  const { FILL, LINE, TEXT, ACCENT } = readPalette();
-  const own = stats.filter((r) => r.population === population).sort((a, b) => a.time_from_treatment_start - b.time_from_treatment_start);
-  const days = own.map((r) => r.time_from_treatment_start);
+export function PopulationBoxplot({ population, points, stats, timepoints, alpha, sharedYMax }: Props) {
+  const { FILL, LINE, TEXT, MUTED, ACCENT } = readPalette();
+  const days = [...timepoints].sort((a, b) => a - b);
   const categories = days.map(dayLabel);
-  const hit = own.some((r) => r.significant === 1);
+  const own = new Map(stats.filter((r) => r.population === population).map((r) => [r.time_from_treatment_start, r]));
+  // A day whose test could not run shows no boxes at all: its samples cannot be read as a comparison.
+  const testable = new Set(days.filter((d) => own.get(d)?.status === "ok"));
+  const hit = days.some((d) => own.get(d)?.significant === 1);
 
   const traces: Data[] = (["no", "yes"] as const).map((response) => {
-    const mine = points.filter((p) => p.response === response);
+    const mine = points.filter((p) => p.response === response && testable.has(p.time_from_treatment_start));
     return {
       type: "box",
       name: response === "yes" ? "Responder" : "Non-responder",
@@ -67,19 +72,24 @@ export function PopulationBoxplot({ population, points, stats, alpha, sharedYMax
     } as Data;
   });
 
-  // p-values as annotations under each day label, so size and color are ours to set.
+  // Adjusted p-values (or `unavailable`) as annotations under each day label, so size and colour are ours to set.
   // Category axes address positions by index, so use the category's index rather than its label.
-  const annotations: Partial<Annotation>[] = own.map((r) => ({
-    x: categories.indexOf(dayLabel(r.time_from_treatment_start)),
-    xref: "x",
-    y: -0.11,
-    yref: "paper",
-    yanchor: "top",
-    text: r.p_adj < alpha ? `<b>adj. p =<br>${formatP(r.p_adj)}</b>` : `adj. p =<br>${formatP(r.p_adj)}`,
-    showarrow: false,
-    font: { size: 12, color: r.p_adj < alpha ? ACCENT : TEXT, family: "Inter, system-ui, sans-serif" },
-    align: "center",
-  }));
+  const annotations: Partial<Annotation>[] = days.map((day, index) => {
+    const row = own.get(day);
+    const available = row?.status === "ok" && row.p_adj !== null;
+    const significant = available && row.p_adj! < alpha;
+    return {
+      x: index,
+      xref: "x",
+      y: -0.11,
+      yref: "paper",
+      yanchor: "top",
+      text: !available ? "unavailable" : significant ? `<b>adj. p =<br>${formatP(row.p_adj!)}</b>` : `adj. p =<br>${formatP(row!.p_adj!)}`,
+      showarrow: false,
+      font: { size: 12, color: !available ? MUTED : significant ? ACCENT : TEXT, family: "Inter, system-ui, sans-serif" },
+      align: "center",
+    };
+  });
 
   const layout: Partial<Layout> = {
     title: { text: POPULATION_LABELS[population], font: { size: 14, color: TEXT }, x: 0.02, xanchor: "left" },
@@ -90,7 +100,7 @@ export function PopulationBoxplot({ population, points, stats, alpha, sharedYMax
     plot_bgcolor: "#ffffff",
     font: { family: "Inter, system-ui, sans-serif", size: 12, color: TEXT },
     xaxis: { type: "category", categoryorder: "array", categoryarray: categories, showgrid: false, tickfont: { size: 12 } },
-    yaxis: { title: { text: "Percent of total" }, gridcolor: "#eef0f3", zeroline: false, rangemode: "tozero", range: sharedYMax ? [0, sharedYMax] : undefined },
+    yaxis: { title: { text: "Percent of total (five populations)" }, gridcolor: "#eef0f3", zeroline: false, rangemode: "tozero", range: sharedYMax ? [0, sharedYMax] : undefined },
     legend: { orientation: "h", y: -0.4, x: 0.5, xanchor: "center" },
     annotations,
     showlegend: true,
