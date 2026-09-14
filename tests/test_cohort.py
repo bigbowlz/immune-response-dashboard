@@ -49,9 +49,5 @@ def test_filter_options(loaded_conn):
     assert options["time_from_treatment_start"] == [0, 7, 14]
 
 
-def test_form_answer(loaded_conn):
-    assert cohort.form_answer(loaded_conn) == (485, 10206.15)
-
-
 def test_response_projects(loaded_conn):
     assert cohort.response_projects(loaded_conn) == ["prj1", "prj3"]

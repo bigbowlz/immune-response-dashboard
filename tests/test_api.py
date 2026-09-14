@@ -142,11 +142,6 @@ def test_subset_options(client):
     assert body["time_from_treatment_start"] == [0, 7, 14]
 
 
-def test_form_answer(client):
-    body = client.get("/api/form-answer").json()
-    assert (body["n_samples"], body["mean_b_cell"]) == (485, 10206.15)
-
-
 def test_missing_db_returns_503(tmp_path, monkeypatch):
     monkeypatch.setenv("CELL_COUNTS_DB", str(tmp_path / "nope.db"))
     monkeypatch.setenv("SERVE_FRONTEND", "0")

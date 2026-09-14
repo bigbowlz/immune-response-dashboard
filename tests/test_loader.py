@@ -52,7 +52,7 @@ def test_no_missing_counts_and_blank_response_is_null(loaded):
 
 def test_result_tables_exist_but_are_empty(loaded):
     conn, _ = loaded
-    for t in ("sample_summary", "response_stats", "cohort_summary", "form_answer", "pipeline_meta"):
+    for t in ("sample_summary", "response_stats", "cohort_summary", "pipeline_meta"):
         assert conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] == 0
 
 

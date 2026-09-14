@@ -10,7 +10,7 @@ Live dashboard: https://immune-response-dashboard.vercel.app (the same app that 
 
 - **Responder comparison** — per-population boxplots of cell frequency by day, with the Mann-Whitney U statistics behind each panel.
 - **Cell frequencies** — a searchable, sortable, exportable table of every sample's relative cell-population frequencies.
-- **Cohort subsets** — filterable sample and subject counts by project, response and sex, plus the baseline form answer.
+- **Cohort subsets** — filterable sample and subject counts by project, response and sex.
 
 No population separates responders from non-responders after multiple-comparison correction; the largest early-treatment signals (B cells lower and CD4 T cells higher in responders at day 14 and day 7) do not reach significance.
 
@@ -46,7 +46,7 @@ Tests: `.venv/bin/python -m pytest`. Interactive API docs: `http://localhost:800
 | API (`server/`) | Reads the pipeline's result tables, and for the cohort explorer's user-chosen filters runs COUNT/GROUP BY queries over the raw sample and subject tables; never imports pandas or scipy, never computes a statistic |
 | Frontend (`frontend/`) | Fetches from the API and renders the three pages |
 
-**Schema** — three raw tables plus five result tables in `cell_counts.db`:
+**Schema** — three raw tables plus four result tables in `cell_counts.db`:
 
 - `subjects` — one row per subject: project, condition, age, sex, treatment, response
 - `samples` — one row per sample: subject, sample type, day (`time_from_treatment_start`)
@@ -54,7 +54,6 @@ Tests: `.venv/bin/python -m pytest`. Interactive API docs: `http://localhost:800
 - `sample_summary` — one row per sample per population: count as a percentage of that sample's total
 - `response_stats` — one row per population per day per stratum: Mann-Whitney U, raw and BH-adjusted p, Cliff's delta, significance
 - `cohort_summary` — baseline-cohort sample and subject counts by project, response and sex; a static answer kept for direct SQL inspection, while `/api/subsets` recomputes counts for user-chosen filters
-- `form_answer` — the baseline free-text question and its answer
 - `pipeline_meta` — provenance of the last pipeline run: `generated_at`, `csv_sha256`, `csv_rows`, `python_version`, `pandas_version`, `scipy_version`
 
 **API** (all `GET`, under `/api`):
@@ -68,7 +67,6 @@ Tests: `.venv/bin/python -m pytest`. Interactive API docs: `http://localhost:800
 | `/api/response/samples?project=all` | Per-sample percentages behind the boxplots, for that stratum |
 | `/api/subsets/options` | The distinct filter values available |
 | `/api/subsets?condition=&treatment=&sample_type=&time_from_treatment_start=` | Sample/subject counts and breakdowns for a filter combination |
-| `/api/form-answer` | The baseline form question and its answer |
 
 **Three requirements files**: `requirements.txt` (fastapi, uvicorn) is API-only because the hosted Python function installs from just this file — the split is a hosting decision, not a doctrine. `requirements-pipeline.txt` (pandas, scipy) is needed only to run the pipeline locally; `requirements-dev.txt` (pytest, httpx, httpx2) is needed only to run the tests.
 
@@ -144,7 +142,6 @@ The test suite asserts the load and analysis numbers end to end:
 - Projects: prj1 384 subjects, prj3 272 subjects
 - Response: 331 responders, 325 non-responders
 - Sex: 344 male, 312 female
-- Form answer: mean b_cell count 10206.15 over 485 samples
 
 Every pipeline run also writes a `pipeline_meta` provenance row — the input CSV's sha256, its row count, and the Python, pandas and scipy versions used — so a given set of numbers can always be traced back to the run that produced them; `/api/health` reports the same values.
 

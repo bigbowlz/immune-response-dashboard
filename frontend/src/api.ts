@@ -1,5 +1,5 @@
 import type {
-  FormAnswer, FrequencyQuery, Health, ResponseSamplesResponse, ResponseStatsResponse, SubsetFilters, SubsetOptions, SubsetsResponse, SummaryResponse,
+  FrequencyQuery, Health, ResponseSamplesResponse, ResponseStatsResponse, SubsetFilters, SubsetOptions, SubsetsResponse, SummaryResponse,
 } from "./types";
 
 /** Thrown for any non-2xx response. `detail` is the API's own message when it sent one (e.g. "Run make pipeline first"). */
@@ -33,4 +33,3 @@ export const getResponseStats = (project = "all", signal?: AbortSignal) => getJs
 export const getResponseSamples = (project = "all", signal?: AbortSignal) => getJson<ResponseSamplesResponse>(`/api/response/samples${query({ project })}`, signal);
 export const getSubsetOptions = () => getJson<SubsetOptions>("/api/subsets/options");
 export const getSubsets = (filters: SubsetFilters, signal?: AbortSignal) => getJson<SubsetsResponse>(`/api/subsets${query(filters)}`, signal);
-export const getFormAnswer = () => getJson<FormAnswer>("/api/form-answer");

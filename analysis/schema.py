@@ -12,7 +12,7 @@ CSV_PATH = ROOT / "cell-count.csv"
 POPULATIONS: tuple[str, ...] = ("b_cell", "cd8_t_cell", "cd4_t_cell", "nk_cell", "monocyte")
 
 RAW_TABLES = ("subjects", "samples", "cell_counts")
-RESULT_TABLES = ("sample_summary", "response_stats", "cohort_summary", "form_answer", "pipeline_meta")
+RESULT_TABLES = ("sample_summary", "response_stats", "cohort_summary", "pipeline_meta")
 
 SCHEMA_SQL = """
 CREATE TABLE subjects (
@@ -73,12 +73,6 @@ CREATE TABLE cohort_summary (
     n_subjects  INTEGER NOT NULL,
     pct_samples REAL NOT NULL,
     PRIMARY KEY (breakdown, category)
-);
-
-CREATE TABLE form_answer (
-    question    TEXT PRIMARY KEY,
-    n_samples   INTEGER NOT NULL,
-    mean_b_cell REAL NOT NULL
 );
 
 -- Provenance of the last pipeline run: generated_at, csv_sha256, csv_rows, python_version, pandas_version, scipy_version.

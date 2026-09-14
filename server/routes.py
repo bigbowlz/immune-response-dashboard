@@ -172,10 +172,3 @@ def subsets(
     breakdowns = {by: cohort.breakdown(conn, filters, by) for by in cohort.BREAKDOWN_COLUMNS}
     return {"filters": filters, **counts, "breakdowns": breakdowns}
 
-
-@router.get("/form-answer")
-def form_answer(conn: Conn) -> dict:
-    row = conn.execute("SELECT question, n_samples, mean_b_cell FROM form_answer").fetchone()
-    if row is None:
-        raise HTTPException(status_code=503, detail="form_answer is empty. Run `make pipeline` first.")
-    return dict(row)

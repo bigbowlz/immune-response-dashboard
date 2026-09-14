@@ -30,7 +30,6 @@ class PipelineReport:
     summary_rows: int
     stats_rows: int
     significant: tuple[tuple[str, str, int], ...]  # (project stratum, population, timepoint)
-    form_answer: tuple[int, float]
     generated_at: str = ""
 
 
@@ -106,21 +105,12 @@ def write_cohort_summary(conn: sqlite3.Connection) -> None:
         conn.executemany("INSERT INTO cohort_summary VALUES (?, ?, ?, ?, ?)", rows)
 
 
-def write_form_answer(conn: sqlite3.Connection) -> tuple[int, float]:
-    n, mean = cohort.form_answer(conn)
-    with conn:
-        conn.execute("DELETE FROM form_answer")
-        conn.execute("INSERT INTO form_answer VALUES (?, ?, ?)", (cohort.FORM_QUESTION, n, mean))
-    return n, mean
-
-
 def run(db_path: Path | None = None, csv_path: Path | None = None) -> PipelineReport:
     conn = schema.connect(db_path)
     try:
         summary_rows = write_sample_summary(conn)
         result = write_response_stats(conn)
         write_cohort_summary(conn)
-        answer = write_form_answer(conn)
         meta = write_pipeline_meta(conn, csv_path or schema.resolve_csv_path())
     finally:
         conn.close()
@@ -128,7 +118,7 @@ def run(db_path: Path | None = None, csv_path: Path | None = None) -> PipelineRe
         (str(r.project), str(r.population), int(r.time_from_treatment_start))
         for r in result.itertuples() if r.significant
     )
-    return PipelineReport(summary_rows, len(result), significant, answer, meta["generated_at"])
+    return PipelineReport(summary_rows, len(result), significant, meta["generated_at"])
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -149,8 +139,6 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  significant at adjusted p < {stats.ALPHA}: {population} at day {day} (project {project})")
     else:
         print(f"  no population reaches adjusted p < {stats.ALPHA} in any stratum")
-    n, mean = report.form_answer
-    print(f"Form answer: mean b_cell = {mean:.2f} (n = {n})")
     return 0
 
 

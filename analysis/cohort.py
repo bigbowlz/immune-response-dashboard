@@ -24,11 +24,6 @@ BREAKDOWN_COLUMNS: dict[str, str] = {
     "time_from_treatment_start": "samples.time_from_treatment_start",
 }
 
-FORM_QUESTION = (
-    "Considering melanoma males of all sample and treatment types, "
-    "what is the average number of B cells for responders at time=0?"
-)
-
 _FROM_SAMPLES = "FROM samples JOIN subjects ON subjects.subject = samples.subject"
 
 
@@ -78,20 +73,6 @@ def filter_options(conn: sqlite3.Connection) -> dict[str, list]:
         key: [r[0] for r in conn.execute(f"SELECT DISTINCT {column} {_FROM_SAMPLES} ORDER BY {column}")]
         for key, column in FILTER_COLUMNS.items()
     }
-
-
-def form_answer(conn: sqlite3.Connection) -> tuple[int, float]:
-    """Mean b_cell count for melanoma, male, responder samples at time 0. No sample_type or treatment filter."""
-    row = conn.execute(
-        "SELECT COUNT(*) AS n, AVG(cell_counts.count) AS mean_count "
-        "FROM cell_counts "
-        "JOIN samples ON samples.sample = cell_counts.sample "
-        "JOIN subjects ON subjects.subject = samples.subject "
-        "WHERE cell_counts.population = 'b_cell' AND subjects.condition = 'melanoma' "
-        "AND subjects.sex = 'M' AND subjects.response = 'yes' AND samples.time_from_treatment_start = 0"
-    ).fetchone()
-    return row["n"], round(row["mean_count"], 2)
-
 
 def response_cohort_points(conn: sqlite3.Connection, project: str | None = None) -> list[sqlite3.Row]:
     """Per-sample percentages for the Part 3 cohort, from the pipeline's sample_summary table.
