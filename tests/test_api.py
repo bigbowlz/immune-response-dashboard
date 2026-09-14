@@ -20,7 +20,7 @@ def test_health(client):
     body = client.get("/api/health").json()
     assert body["status"] == "ok"
     assert body["tables"]["samples"] == 10500
-    assert body["tables"]["response_stats"] == 45
+    assert body["tables"]["response_stats"] == 5760
     assert body["db_path"] == "pipeline.db"  # file name only; never the server's absolute path
     assert set(body["meta"]) >= {"generated_at", "csv_sha256"}
 
@@ -73,73 +73,137 @@ def test_frequencies_csv(client):
     assert counts == sorted(counts, reverse=True) and len(counts) == 5
 
 
-def test_response_stats(client):
-    body = client.get("/api/response/stats").json()
-    assert body["alpha"] == 0.05 and body["n_tests"] == 15 and body["project"] == "all"
-    assert body["projects"] == ["prj1", "prj3"]
-    assert len(body["rows"]) == 15 and all(r["project"] == "all" for r in body["rows"])
-    assert set(body["rows"][0]) >= {"project", "population", "time_from_treatment_start", "n_responders", "p_raw", "p_adj", "effect_size", "significant"}
-    prj3 = client.get("/api/response/stats", params={"project": "prj3"}).json()
-    assert len(prj3["rows"]) == 15 and all(r["n_responders"] == 136 and r["n_nonresponders"] == 136 for r in prj3["rows"])
-    assert client.get("/api/response/stats", params={"project": "prj2"}).status_code == 422  # not in the cohort
-    assert client.get("/api/response/stats", params={"project": "x' OR 1=1"}).status_code == 422
+def test_cohort_options(client):
+    body = client.get("/api/cohort/options").json()
+    assert body["condition"] == ["carcinoma", "healthy", "melanoma"]
+    assert body["treatment"] == ["miraclib", "none", "phauximab"]
+    assert body["sample_type"] == ["PBMC", "WB"]
+    assert body["project"] == ["prj1", "prj2", "prj3"]
+    assert body["time_from_treatment_start"] == [0, 7, 14]
 
 
-def test_response_samples(client):
-    body = client.get("/api/response/samples").json()
+def test_cohort_summary_default(client):
+    body = client.get("/api/cohort/summary").json()
+    assert body["filters"] == {
+        "condition": "melanoma", "treatment": "miraclib", "sample_type": "PBMC",
+        "project": "all", "time_from_treatment_start": "all",
+    }
+    assert (body["n_samples"], body["n_subjects"], body["n_missing_response"]) == (1968, 656, 0)
+    response = {r["category"]: r["n_samples"] for r in body["breakdowns"]["response"]}
+    assert response == {"yes": 993, "no": 975}
+    assert set(body["breakdowns"]) == {"project", "response", "sex", "time_from_treatment_start"}
+
+
+def test_cohort_summary_all_relaxed_has_unknown_response(client):
+    params = {"condition": "all", "treatment": "all", "sample_type": "all", "project": "all", "time_from_treatment_start": "all"}
+    body = client.get("/api/cohort/summary", params=params).json()
+    assert body["n_samples"] == 10500
+    response = {r["category"]: r["n_samples"] for r in body["breakdowns"]["response"]}
+    assert response["unknown"] == 1422
+
+
+def test_cohort_stats_default(client):
+    body = client.get("/api/cohort/stats").json()
+    assert body["filters"]["project"] == "all" and body["family"] == "all"
+    assert body["alpha"] == 0.05
+    assert body["n_tests"] == 15 and len(body["rows"]) == 15
+    assert (body["n_samples"], body["n_subjects"], body["n_missing_response"]) == (1968, 656, 0)
+    min_row = min(body["rows"], key=lambda r: r["p_adj"])
+    assert min_row["population"] == "b_cell" and min_row["time_from_treatment_start"] == 14
+    assert 0.2 <= min_row["p_adj"] <= 0.25
+    assert all("status" in r and "reason" in r for r in body["rows"])
+    timepoints = [r["time_from_treatment_start"] for r in body["rows"]]
+    assert timepoints == sorted(timepoints)
+
+
+def test_cohort_stats_single_timepoint(client):
+    body = client.get("/api/cohort/stats", params={"time_from_treatment_start": "14"}).json()
+    assert body["family"] == "14"
+    assert body["n_tests"] == 5 and len(body["rows"]) == 5
+    assert all(r["time_from_treatment_start"] == 14 for r in body["rows"])
+
+
+def test_cohort_stats_healthy_none_all_unavailable(client):
+    body = client.get("/api/cohort/stats", params={"condition": "healthy", "treatment": "none"}).json()
+    assert len(body["rows"]) == 15 and body["n_tests"] == 0
+    assert all(r["status"] == "unavailable" for r in body["rows"])
+    assert all(r["reason"] == "no recorded responses in this cohort" for r in body["rows"])
+    assert all(r["p_adj"] is None for r in body["rows"])
+
+
+def test_cohort_stats_no_matching_samples(client):
+    body = client.get("/api/cohort/stats", params={"project": "prj2"}).json()
+    assert all(r["status"] == "unavailable" for r in body["rows"])
+    assert all(r["reason"] == "no samples match this cohort at this timepoint" for r in body["rows"])
+
+
+def test_cohort_points_default(client):
+    body = client.get("/api/cohort/points").json()
     assert len(body["points"]) == 1968 * 5
     p = body["points"][0]
     assert set(p) == {"sample", "subject", "project", "population", "time_from_treatment_start", "response", "percentage"}
     assert {x["response"] for x in body["points"]} == {"yes", "no"}
-    prj1 = client.get("/api/response/samples", params={"project": "prj1"}).json()["points"]
-    assert len(prj1) == 1152 * 5 and {x["project"] for x in prj1} == {"prj1"}
-    assert client.get("/api/response/samples", params={"project": "all"}).json()["points"] == body["points"]
 
 
-BASELINE_PARAMS = {"condition": "melanoma", "treatment": "miraclib", "sample_type": "PBMC", "time_from_treatment_start": "0"}
+def test_cohort_samples_total_matches_summary(client):
+    for params in (
+        {},
+        {"condition": "healthy", "treatment": "none"},
+        {"condition": "all", "treatment": "all", "sample_type": "all", "project": "all", "time_from_treatment_start": "all"},
+    ):
+        summary = client.get("/api/cohort/summary", params=params).json()
+        samples = client.get("/api/cohort/samples", params=params).json()
+        assert samples["total"] == summary["n_samples"]
+    assert client.get("/api/cohort/samples", params={"condition": "all", "treatment": "all", "sample_type": "all", "project": "all", "time_from_treatment_start": "all"}).json()["total"] == 10500
 
 
-def test_subsets_omitted_filters_mean_unfiltered(client):
-    body = client.get("/api/subsets").json()
-    assert body["filters"] == {"condition": None, "treatment": None, "sample_type": None, "time_from_treatment_start": None}
-    assert (body["n_samples"], body["n_subjects"]) == (10500, 3500)
+def test_cohort_samples_paging_and_sort(client):
+    body = client.get("/api/cohort/samples", params={"limit": 2}).json()
+    assert (body["limit"], body["offset"], len(body["rows"])) == (2, 0, 2)
+    assert body["total"] == 1968
+    assert set(body["rows"][0]) == {"sample", "subject", "project", "condition", "treatment", "sample_type", "time_from_treatment_start", "response", "sex"}
+    page2 = client.get("/api/cohort/samples", params={"limit": 2, "offset": 2}).json()
+    assert page2["rows"][0]["sample"] != body["rows"][0]["sample"]
+    desc = client.get("/api/cohort/samples", params={"sort": "subject", "dir": "desc", "limit": 1}).json()
+    asc = client.get("/api/cohort/samples", params={"sort": "subject", "dir": "asc", "limit": 1}).json()
+    assert desc["rows"][0]["subject"] > asc["rows"][0]["subject"]
+    assert client.get("/api/cohort/samples", params={"limit": 0}).status_code == 422
+    assert client.get("/api/cohort/samples", params={"limit": 501}).status_code == 422
+    assert client.get("/api/cohort/samples", params={"offset": -1}).status_code == 422
 
 
-def test_subsets_baseline_cohort(client):
-    body = client.get("/api/subsets", params=BASELINE_PARAMS).json()
-    assert body["filters"] == {"condition": "melanoma", "treatment": "miraclib", "sample_type": "PBMC", "time_from_treatment_start": 0}
-    assert (body["n_samples"], body["n_subjects"]) == (656, 656)
-    project = {r["category"]: r["n_samples"] for r in body["breakdowns"]["project"]}
-    assert project == {"prj1": 384, "prj3": 272}
-    response = {r["category"]: r["n_subjects"] for r in body["breakdowns"]["response"]}
-    assert response == {"yes": 331, "no": 325}
-    sex = {r["category"]: r["n_subjects"] for r in body["breakdowns"]["sex"]}
-    assert sex == {"M": 344, "F": 312}
+def test_cohort_samples_csv(client):
+    response = client.get("/api/cohort/samples.csv", params={"time_from_treatment_start": "0"})
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert response.headers["content-disposition"] == 'attachment; filename="samples.csv"'
+    lines = response.text.strip().splitlines()
+    assert lines[0] == "sample,subject,project,condition,treatment,sample_type,time_from_treatment_start,response,sex"
+    assert len(lines) == 657
 
 
-def test_subsets_all_relaxes_a_filter(client):
-    body = client.get("/api/subsets", params={**BASELINE_PARAMS, "time_from_treatment_start": "all"}).json()
-    assert body["filters"]["time_from_treatment_start"] is None
-    assert body["n_samples"] == 1968 and body["n_subjects"] == 656
-    days = {r["category"]: r["n_samples"] for r in body["breakdowns"]["time_from_treatment_start"]}
-    assert days == {0: 656, 7: 656, 14: 656}
+def test_cohort_samples_null_response_serializes_as_empty_csv_and_null_json(client):
+    params = {"condition": "healthy", "treatment": "none"}
+    json_body = client.get("/api/cohort/samples", params={**params, "limit": 1}).json()
+    assert json_body["rows"][0]["response"] is None
+    csv_text = client.get("/api/cohort/samples.csv", params=params).text
+    first_row = csv_text.strip().splitlines()[1].split(",")
+    assert first_row[7] == ""  # response column, per SAMPLE_COLUMNS order
 
 
-def test_subsets_empty_result_is_well_formed(client):
-    body = client.get("/api/subsets", params={"condition": "healthy", "treatment": "miraclib"}).json()
-    assert body["n_samples"] == 0 and body["n_subjects"] == 0
-    assert all(rows == [] for rows in body["breakdowns"].values())
+def test_cohort_filters_reject_unknown_values(client):
+    assert client.get("/api/cohort/summary", params={"condition": "unicorn"}).status_code == 422
+    assert client.get("/api/cohort/summary", params={"project": "prj9"}).status_code == 422
+    assert client.get("/api/cohort/summary", params={"time_from_treatment_start": "abc"}).status_code == 422
+    assert client.get("/api/cohort/samples", params={"sort": "DROP"}).status_code == 422
+    assert client.get("/api/cohort/stats", params={"condition": "x' OR 1=1"}).status_code == 422
 
 
-def test_subsets_rejects_unknown_value(client):
-    assert client.get("/api/subsets", params={"condition": "unicorn"}).status_code == 422
-    assert client.get("/api/subsets", params={"time_from_treatment_start": "abc"}).status_code == 422
-
-
-def test_subset_options(client):
-    body = client.get("/api/subsets/options").json()
-    assert body["condition"] == ["carcinoma", "healthy", "melanoma"]
-    assert body["time_from_treatment_start"] == [0, 7, 14]
+def test_removed_endpoints_are_gone(client):
+    assert client.get("/api/response/stats").status_code == 404
+    assert client.get("/api/response/samples").status_code == 404
+    assert client.get("/api/subsets").status_code == 404
+    assert client.get("/api/subsets/options").status_code == 404
 
 
 def test_missing_db_returns_503(tmp_path, monkeypatch):

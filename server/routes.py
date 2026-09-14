@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import io
 import sqlite3
+from dataclasses import dataclass
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -24,6 +25,11 @@ SortColumn = Literal["sample", "total_count", "population", "count", "percentage
 SortDir = Literal["asc", "desc"]
 Search = Annotated[str | None, Query(max_length=100, description="Substring match on sample or population")]
 POPULATION_ORDER = "CASE population WHEN 'b_cell' THEN 0 WHEN 'cd8_t_cell' THEN 1 WHEN 'cd4_t_cell' THEN 2 WHEN 'nk_cell' THEN 3 ELSE 4 END"
+
+# The four columns that identify a selectable cohort key in response_stats/response_strata
+# (the fifth filter, time_from_treatment_start, is the correction family instead).
+COHORT_KEY_COLUMNS = ("condition", "treatment", "sample_type", "project")
+SampleSortColumn = Literal[cohort.SAMPLE_COLUMNS]
 
 
 @router.get("/health")
@@ -101,74 +107,153 @@ def frequencies_csv(conn: Conn, search: Search = None, sort: SortColumn = "sampl
     )
 
 
-def _parse_project(conn: sqlite3.Connection, project: str) -> tuple[str | None, list[str]]:
-    """Returns (project filter or None for the whole cohort, list of projects in the cohort)."""
-    projects = cohort.response_projects(conn)
-    if project == "all":
-        return None, projects
-    if project not in projects:
-        raise HTTPException(status_code=422, detail=f"project must be 'all' or one of {projects}")
-    return project, projects
+@dataclass(frozen=True)
+class CohortFilters:
+    """The five cohort filters, in three shapes used by different callers.
 
-
-@router.get("/response/stats")
-def response_stats(conn: Conn, project: str = "all") -> dict:
-    """Part 3 statistics for one stratum: the whole cohort ('all') or a single project."""
-    _, projects = _parse_project(conn, project)
-    rows = conn.execute(
-        f"SELECT * FROM response_stats WHERE project = ? ORDER BY time_from_treatment_start, {POPULATION_ORDER}",
-        [project],
-    ).fetchall()
-    return {"rows": [dict(r) for r in rows], "alpha": ALPHA, "n_tests": len(rows), "project": project, "projects": projects, "cohort": cohort.RESPONSE_COHORT}
-
-
-@router.get("/response/samples")
-def response_samples(conn: Conn, project: str = "all") -> dict:
-    """Per-sample percentages behind the Part 3 boxplots, for the whole cohort or one project."""
-    project_filter, _ = _parse_project(conn, project)
-    return {"points": [dict(r) for r in cohort.response_cohort_points(conn, project_filter)]}
-
-
-@router.get("/subsets/options")
-def subset_options(conn: Conn) -> dict:
-    return cohort.filter_options(conn)
-
-
-def _parse_filter(name: str, raw: str | None, options: dict[str, list]) -> object:
-    """Omitted or 'all' means unfiltered; anything else must be a value that exists in the data."""
-    if raw is None or raw == "all":
-        return None
-    allowed = options[name]
-    if name == "time_from_treatment_start":
-        try:
-            value: object = int(raw)
-        except ValueError:
-            raise HTTPException(status_code=422, detail=f"{name} must be an integer or 'all'") from None
-    else:
-        value = raw
-    if value not in allowed:
-        raise HTTPException(status_code=422, detail=f"{name} must be one of {allowed} or 'all'")
-    return value
-
-
-@router.get("/subsets")
-def subsets(
-    conn: Conn,
-    condition: str | None = None,
-    treatment: str | None = None,
-    sample_type: str | None = None,
-    time_from_treatment_start: str | None = None,
-) -> dict:
-    """Part 4: sample and subject counts by project, response, sex and timepoint for any filter combination.
-
-    Each parameter is optional; omitted or 'all' means unfiltered. The baseline cohort the assignment
-    asks for is condition=melanoma&treatment=miraclib&sample_type=PBMC&time_from_treatment_start=0.
+    `filters`: mapping for `cohort.build_where`/`cohort.breakdown` etc. -- 'all' becomes None and the
+    timepoint becomes an int.
+    `key`: the five request strings as sent (with 'all' kept literal), for `response_stats` lookups and
+    for echoing back in a response body.
+    `family`: `key["time_from_treatment_start"]` -- 'all' or the day string, the response_stats/
+    response_strata correction-family column.
     """
-    options = cohort.filter_options(conn)
-    raw = {"condition": condition, "treatment": treatment, "sample_type": sample_type,
-           "time_from_treatment_start": time_from_treatment_start}
-    filters = {name: _parse_filter(name, raw[name], options) for name in cohort.FILTER_COLUMNS}
-    counts = cohort.count_cohort(conn, filters)
-    breakdowns = {by: cohort.breakdown(conn, filters, by) for by in cohort.BREAKDOWN_COLUMNS}
-    return {"filters": filters, **counts, "breakdowns": breakdowns}
 
+    filters: dict[str, object]
+    key: dict[str, str]
+    family: str
+
+
+def cohort_filters(
+    conn: Conn,
+    condition: Annotated[str, Query(description="'all' or a condition from /api/cohort/options")] = "melanoma",
+    treatment: Annotated[str, Query(description="'all' or a treatment from /api/cohort/options")] = "miraclib",
+    sample_type: Annotated[str, Query(description="'all' or a sample type from /api/cohort/options")] = "PBMC",
+    project: Annotated[str, Query(description="'all' or a project from /api/cohort/options")] = "all",
+    time_from_treatment_start: Annotated[str, Query(description="'all' or a timepoint from /api/cohort/options")] = "all",
+) -> CohortFilters:
+    options = cohort.cohort_options(conn)
+    raw = {
+        "condition": condition,
+        "treatment": treatment,
+        "sample_type": sample_type,
+        "project": project,
+        "time_from_treatment_start": time_from_treatment_start,
+    }
+    filters: dict[str, object] = {}
+    for name, value in raw.items():
+        allowed = options[name]
+        if value == "all":
+            filters[name] = None
+            continue
+        if name == "time_from_treatment_start":
+            try:
+                parsed: object = int(value)
+            except ValueError:
+                raise HTTPException(status_code=422, detail=f"{name} must be 'all' or one of {allowed}") from None
+        else:
+            parsed = value
+        if parsed not in allowed:
+            raise HTTPException(status_code=422, detail=f"{name} must be 'all' or one of {allowed}")
+        filters[name] = parsed
+    return CohortFilters(filters=filters, key=raw, family=raw["time_from_treatment_start"])
+
+
+Filters = Annotated[CohortFilters, Depends(cohort_filters)]
+
+
+@router.get("/cohort/options")
+def cohort_options(conn: Conn) -> dict:
+    """Distinct values for every cohort filter; timepoints as integers."""
+    return cohort.cohort_options(conn)
+
+
+@router.get("/cohort/summary")
+def cohort_summary(conn: Conn, filters: Filters) -> dict:
+    """Composition of the selected cohort, over the raw tables."""
+    counts = cohort.count_cohort(conn, filters.filters)
+    breakdowns = {by: cohort.breakdown(conn, filters.filters, by) for by in cohort.BREAKDOWN_COLUMNS}
+    return {
+        "filters": filters.key,
+        "n_samples": counts["n_samples"],
+        "n_subjects": counts["n_subjects"],
+        "n_missing_response": cohort.missing_response_count(conn, filters.filters),
+        "breakdowns": breakdowns,
+    }
+
+
+@router.get("/cohort/stats")
+def cohort_stats(conn: Conn, filters: Filters) -> dict:
+    """Precomputed response statistics for the selected cohort key and correction family."""
+    key_params = [filters.key[column] for column in COHORT_KEY_COLUMNS]
+    strata = conn.execute(
+        "SELECT n_samples, n_subjects, n_missing_response, n_tests FROM response_strata "
+        "WHERE condition = ? AND treatment = ? AND sample_type = ? AND project = ? AND timepoints = ?",
+        [*key_params, filters.family],
+    ).fetchone()
+    if strata is None:
+        # Every selectable key x family is precomputed by the pipeline; a miss means the database
+        # predates this cohort's key set.
+        raise HTTPException(status_code=503, detail="Statistics are not precomputed for this cohort. Run `make pipeline`, then reload.")
+    rows = conn.execute(
+        "SELECT * FROM response_stats WHERE condition = ? AND treatment = ? AND sample_type = ? AND project = ? AND timepoints = ? "
+        f"ORDER BY time_from_treatment_start, {POPULATION_ORDER}",
+        [*key_params, filters.family],
+    ).fetchall()
+    return {
+        "filters": filters.key,
+        "family": filters.family,
+        "rows": [dict(r) for r in rows],
+        "alpha": ALPHA,
+        "n_tests": strata["n_tests"],
+        "n_samples": strata["n_samples"],
+        "n_subjects": strata["n_subjects"],
+        "n_missing_response": strata["n_missing_response"],
+    }
+
+
+@router.get("/cohort/points")
+def cohort_points(conn: Conn, filters: Filters) -> dict:
+    """Per-sample percentages for samples with a recorded response, for the boxplots."""
+    return {"points": [dict(r) for r in cohort.response_points(conn, filters.filters)]}
+
+
+@router.get("/cohort/samples")
+def cohort_samples(
+    conn: Conn,
+    filters: Filters,
+    sort: SampleSortColumn = "sample",
+    dir: SortDir = "asc",
+    limit: Annotated[int, Query(ge=1, le=500)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> dict:
+    total = cohort.count_samples(conn, filters.filters)
+    rows = cohort.list_samples(conn, filters.filters, sort=sort, direction=dir, limit=limit, offset=offset)
+    return {"rows": rows, "total": total, "limit": limit, "offset": offset}
+
+
+@router.get("/cohort/samples.csv")
+def cohort_samples_csv(conn: Conn, filters: Filters, sort: SampleSortColumn = "sample", dir: SortDir = "asc") -> StreamingResponse:
+    """Every matching sample as CSV, in the same order the table shows."""
+    total = cohort.count_samples(conn, filters.filters)
+    # `list_samples` already materialises its rows (fetchall) before returning, so this happens
+    # before the StreamingResponse below is built and the connection dependency closes.
+    rows = cohort.list_samples(conn, filters.filters, sort=sort, direction=dir, limit=max(total, 1), offset=0)
+    tuples = [tuple(r[column] for column in cohort.SAMPLE_COLUMNS) for r in rows]
+
+    def generate():
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(cohort.SAMPLE_COLUMNS)
+        yield buffer.getvalue()
+        for start in range(0, len(tuples), 2000):
+            buffer.seek(0)
+            buffer.truncate()
+            writer.writerows(tuples[start:start + 2000])
+            yield buffer.getvalue()
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="samples.csv"'},
+    )
