@@ -2,7 +2,7 @@
 
 Explore how immune cell populations differ between responders and non-responders in a clinical trial dataset.
 
-Live dashboard: link added after deployment
+Live dashboard: https://immune-response-dashboard.vercel.app (the same app that `make dashboard` serves locally at http://localhost:8000)
 
 ![Dashboard](docs/dashboard.png)
 
