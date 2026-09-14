@@ -10,11 +10,16 @@ function cssVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
-const FILL = { no: cssVar("--nonresponder", "#7f8ce0"), yes: cssVar("--responder", "#4caf7d") } as const;
-const LINE = { no: cssVar("--nonresponder-line", "#4c5cc7"), yes: cssVar("--responder-line", "#2e7d55") } as const;
+// Resolved at render time, not at module load, so the stylesheet is guaranteed to be applied first.
+function readPalette() {
+  return {
+    FILL: { no: cssVar("--nonresponder", "#7f8ce0"), yes: cssVar("--responder", "#4caf7d") } as const,
+    LINE: { no: cssVar("--nonresponder-line", "#4c5cc7"), yes: cssVar("--responder-line", "#2e7d55") } as const,
+    TEXT: cssVar("--text", "#1f2328"),
+    ACCENT: cssVar("--accent", "#d6453d"),
+  };
+}
 const SYMBOL = { no: "circle", yes: "diamond" } as const;
-const TEXT = cssVar("--text", "#1f2328");
-const ACCENT = cssVar("--accent", "#d6453d");
 
 export function formatP(p: number): string {
   if (p < 0.001) return "< 0.001";
@@ -36,6 +41,7 @@ interface Props {
 }
 
 export function PopulationBoxplot({ population, points, stats, alpha, sharedYMax }: Props) {
+  const { FILL, LINE, TEXT, ACCENT } = readPalette();
   const own = stats.filter((r) => r.population === population).sort((a, b) => a.time_from_treatment_start - b.time_from_treatment_start);
   const days = own.map((r) => r.time_from_treatment_start);
   const categories = days.map(dayLabel);
