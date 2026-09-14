@@ -124,6 +124,8 @@ export function CohortPage() {
   // request writes the list only while it is still the newest one, whichever effect started it.
   const samplesRequest = useRef(0);
   const lastSamples = useRef<{ controller: AbortController; shared: boolean } | null>(null);
+  // The same idea for the cohort fetch as a whole: a superseded filter fetch may not report its failure.
+  const filterRequest = useRef(0);
 
   /**
    * Start a samples fetch and commit it only if it is still the newest one. `shared` marks the fetch
@@ -157,25 +159,32 @@ export function CohortPage() {
   // a superseded response is aborted and never reaches the state.
   useEffect(() => {
     const controller = new AbortController();
+    const filterId = ++filterRequest.current;
     setLoading(true);
+    const samplesPromise = startSamples(filters, DEFAULT_TABLE, controller, true);
+    const samplesId = samplesRequest.current;
     Promise.all([
       getCohortSummary(filters, controller.signal),
       getCohortStats(filters, controller.signal),
       getCohortPoints(filters, controller.signal),
-      startSamples(filters, DEFAULT_TABLE, controller, true),
+      samplesPromise,
     ])
       .then(([s, st, p]) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || filterId !== filterRequest.current) return;
         setSummary(s); setStats(st); setPoints(p.points);
         setError(null);
       })
       .catch((e: Error) => {
         if (e.name === "AbortError") return;
-        setSummary(null); setStats(null); setPoints([]); setSamples([]); setSamplesTotal(0);
+        // Failures obey the same guards as successes: a newer samples fetch keeps its rows, and a
+        // superseded filter fetch reports nothing at all.
+        if (samplesId === samplesRequest.current) { setSamples([]); setSamplesTotal(0); setSamplesLoading(false); }
+        if (filterId !== filterRequest.current) return;
+        setSummary(null); setStats(null); setPoints([]);
         setError(e.message);
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted && filterId === filterRequest.current) setLoading(false);
       });
     return () => controller.abort();
   }, [filters]);
@@ -209,6 +218,29 @@ export function CohortPage() {
   const failed = !loading && error !== null && summary === null;
   const description = cohortDescription(filters);
 
+  // Defined once: the samples list is also worth showing when the rest of the cohort fetch failed but a
+  // newer samples request had already delivered rows for these filters.
+  const samplesCard = (
+    <Card title="Matching samples" subtitle="Every sample in the selected cohort. Sorting, paging and the export cover all matching rows, not just the page shown.">
+      {error && <p className="error">{error}</p>}
+      <DataTable
+        columns={SAMPLE_COLUMNS}
+        rows={samples}
+        pageSize={PAGE_SIZE}
+        total={samplesTotal}
+        page={table.page}
+        onPageChange={(page) => setTable((t) => ({ ...t, page }))}
+        sortKey={table.sort}
+        sortDir={table.dir}
+        onSortChange={(key, dir) => setTable({ sort: key as SampleColumn, dir, page: 0 })}
+        loading={samplesLoading}
+        emptyText="No samples match these filters."
+        rowKey={(row) => row.sample}
+        toolbar={<a className="button" href={cohortSamplesCsvUrl(filters, table.sort, table.dir)} download>Export CSV</a>}
+      />
+    </Card>
+  );
+
   return (
     <>
       <PageHeader
@@ -224,10 +256,13 @@ export function CohortPage() {
       />
 
       {failed ? (
-        <Card title="This cohort could not be loaded">
-          <p className="error">{error}</p>
-          <p className="note">Change a filter to try another cohort, or reset to the default one.</p>
-        </Card>
+        <>
+          <Card title="This cohort could not be loaded">
+            <p className="error">{error}</p>
+            <p className="note">Change a filter to try another cohort, or reset to the default one.</p>
+          </Card>
+          {samples.length > 0 && samplesCard}
+        </>
       ) : empty ? (
         <Card title="Key metadata distribution">
           <div className="empty" aria-live="polite">
@@ -323,24 +358,7 @@ export function CohortPage() {
             )}
           </Card>
 
-          <Card title="Matching samples" subtitle="Every sample in the selected cohort. Sorting, paging and the export cover all matching rows, not just the page shown.">
-            {error && <p className="error">{error}</p>}
-            <DataTable
-              columns={SAMPLE_COLUMNS}
-              rows={samples}
-              pageSize={PAGE_SIZE}
-              total={samplesTotal}
-              page={table.page}
-              onPageChange={(page) => setTable((t) => ({ ...t, page }))}
-              sortKey={table.sort}
-              sortDir={table.dir}
-              onSortChange={(key, dir) => setTable({ sort: key as SampleColumn, dir, page: 0 })}
-              loading={samplesLoading}
-              emptyText="No samples match these filters."
-              rowKey={(row) => row.sample}
-              toolbar={<a className="button" href={cohortSamplesCsvUrl(filters, table.sort, table.dir)} download>Export CSV</a>}
-            />
-          </Card>
+          {samplesCard}
         </>
       )}
     </>
