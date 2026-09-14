@@ -45,6 +45,11 @@ export function DataTable<T extends object>(props: Props<T>) {
     copy.sort((a, b) => {
       const av = a[sortKey as keyof T];
       const bv = b[sortKey as keyof T];
+      // Missing values sort last whichever way the column is pointing, so an unavailable row never
+      // pushes a real value off the top of the table.
+      const aMissing = av === null || av === undefined;
+      const bMissing = bv === null || bv === undefined;
+      if (aMissing || bMissing) return aMissing && bMissing ? 0 : aMissing ? 1 : -1;
       const cmp = typeof av === "number" && typeof bv === "number" ? av - bv : String(av).localeCompare(String(bv));
       return sortDir === "asc" ? cmp : -cmp;
     });
@@ -58,6 +63,7 @@ export function DataTable<T extends object>(props: Props<T>) {
 
   const setPage = (p: number) => (controlled ? props.onPageChange?.(p) : setLocalPage(p));
   const toggleSort = (key: string) => {
+    if (loading) return;
     const dir: SortDir = sortKey === key && sortDir === "asc" ? "desc" : "asc";
     if (controlled) props.onSortChange?.(key, dir);
     else { setLocalSortKey(key); setLocalSortDir(dir); setLocalPage(0); }
@@ -79,7 +85,7 @@ export function DataTable<T extends object>(props: Props<T>) {
                     className={`${c.numeric ? "num " : ""}${active ? "sorted" : ""}`}
                     aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                   >
-                    <button type="button" className="th-sort" onClick={() => toggleSort(c.key)} aria-label={`Sort by ${c.label}`}>
+                    <button type="button" className="th-sort" onClick={() => toggleSort(c.key)} disabled={loading} aria-label={`Sort by ${c.label}`}>
                       {c.label}{active ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
                     </button>
                   </th>
@@ -108,9 +114,9 @@ export function DataTable<T extends object>(props: Props<T>) {
         <span aria-live="polite">Total Rows: {total.toLocaleString()}</span>
         {pages > 1 && (
           <span className="pager">
-            <button onClick={() => setPage(current - 1)} disabled={current === 0} aria-label="Previous page">Prev</button>
+            <button onClick={() => setPage(current - 1)} disabled={loading || current === 0} aria-label="Previous page">Prev</button>
             <span className="current"> {current + 1} </span> / {pages}
-            <button onClick={() => setPage(current + 1)} disabled={current >= pages - 1} aria-label="Next page">Next</button>
+            <button onClick={() => setPage(current + 1)} disabled={loading || current >= pages - 1} aria-label="Next page">Next</button>
           </span>
         )}
       </div>

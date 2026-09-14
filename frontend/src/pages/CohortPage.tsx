@@ -17,7 +17,8 @@ const DEFAULT_FILTERS: CohortFilters = {
   condition: "melanoma", treatment: "miraclib", sample_type: "PBMC", project: "all", time_from_treatment_start: "all",
 };
 const PAGE_SIZE = 50;
-const DEFAULT_TABLE = { sort: "sample" as SampleColumn, dir: "asc" as SortDir, page: 0 };
+interface TableState { sort: SampleColumn; dir: SortDir; page: number }
+const DEFAULT_TABLE: TableState = { sort: "sample", dir: "asc", page: 0 };
 
 const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const populationLabel = (s: CohortStat) => POPULATION_LABELS[s.population];
@@ -77,7 +78,7 @@ const STAT_COLUMNS = (alpha: number): ColumnDef<CohortStat>[] => [
   { key: "u_statistic", label: "U", numeric: true, format: (v) => (v === null ? "—" : Number(v).toLocaleString()) },
   // An unavailable cell has no p-values: the reason takes their place.
   { key: "p_raw", label: "p (raw)", numeric: true, render: (v, row) => (row.status === "ok" && v !== null ? formatP(Number(v)) : <span className="reason">{row.reason}</span>) },
-  { key: "p_adj", label: "p (BH-adjusted)", numeric: true, render: (v, row) => (row.status === "ok" && v !== null ? <span className={Number(v) < alpha ? "sig" : undefined}>{formatP(Number(v))}</span> : "") },
+  { key: "p_adj", label: "p (BH-adjusted)", numeric: true, render: (v, row) => (row.status === "ok" && v !== null ? <span className={Number(v) < alpha ? "sig" : undefined}>{formatP(Number(v))}</span> : "—") },
   { key: "effect_size", label: "Cliff's delta", numeric: true, format: (v) => (v === null ? "—" : formatDelta(Number(v))) },
   {
     key: "status",
@@ -90,15 +91,16 @@ const STAT_COLUMNS = (alpha: number): ColumnDef<CohortStat>[] => [
 ];
 
 const SAMPLE_COLUMNS: ColumnDef<SampleRow>[] = [
-  { key: "sample", label: "sample" },
-  { key: "subject", label: "subject" },
-  { key: "project", label: "project" },
-  { key: "condition", label: "condition" },
-  { key: "treatment", label: "treatment" },
-  { key: "sample_type", label: "sample_type" },
-  { key: "time_from_treatment_start", label: "time_from_treatment_start", numeric: true },
-  { key: "response", label: "response", format: (v) => (v === null ? "—" : String(v)) },
-  { key: "sex", label: "sex" },
+  { key: "sample", label: "Sample ID" },
+  { key: "subject", label: "Subject ID" },
+  { key: "project", label: "Project" },
+  { key: "condition", label: "Condition" },
+  { key: "treatment", label: "Treatment" },
+  { key: "sample_type", label: "Sample type" },
+  { key: "time_from_treatment_start", label: "Timepoint (days)", numeric: true },
+  // The CSV keeps the empty field the database holds; the table spells it out.
+  { key: "response", label: "Response", format: (v) => (v === null ? "not recorded" : String(v)) },
+  { key: "sex", label: "Sex" },
 ];
 
 export function CohortPage() {
@@ -111,13 +113,41 @@ export function CohortPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [table, setTable] = useState(DEFAULT_TABLE);
+  const [table, setTable] = useState<TableState>(DEFAULT_TABLE);
   const [samples, setSamples] = useState<SampleRow[]>([]);
   const [samplesTotal, setSamplesTotal] = useState(0);
   const [samplesLoading, setSamplesLoading] = useState(true);
   // The cohort fetch below already loads the first samples page, so the samples-only effect stands
   // down for the render that follows a filter change (and for the first render).
   const samplesHandled = useRef(true);
+  // Both effects fetch the samples list, so one counter decides which answer may be rendered: a
+  // request writes the list only while it is still the newest one, whichever effect started it.
+  const samplesRequest = useRef(0);
+  const lastSamples = useRef<{ controller: AbortController; shared: boolean } | null>(null);
+
+  /**
+   * Start a samples fetch and commit it only if it is still the newest one. `shared` marks the fetch
+   * that rides along with a filter change: it supersedes an in-flight sort/page fetch, while a
+   * sort/page fetch never aborts a filter fetch (whose summary, stats and points share its controller).
+   */
+  const startSamples = (f: CohortFilters, t: TableState, controller: AbortController, shared: boolean) => {
+    const previous = lastSamples.current;
+    if (previous && previous.controller !== controller && (shared || !previous.shared)) previous.controller.abort();
+    lastSamples.current = { controller, shared };
+    const id = ++samplesRequest.current;
+    setSamplesLoading(true);
+    const request = getCohortSamples(f, { sort: t.sort, dir: t.dir, limit: PAGE_SIZE, offset: t.page * PAGE_SIZE }, controller.signal);
+    request.then(
+      (r) => {
+        if (id !== samplesRequest.current) return;
+        setSamples(r.rows); setSamplesTotal(r.total); setSamplesLoading(false); setError(null);
+      },
+      () => {
+        if (id === samplesRequest.current && !controller.signal.aborted) setSamplesLoading(false);
+      },
+    );
+    return request;
+  };
 
   useEffect(() => {
     getCohortOptions().then(setOptions).catch((e: Error) => setError(e.message));
@@ -128,17 +158,15 @@ export function CohortPage() {
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    setSamplesLoading(true);
     Promise.all([
       getCohortSummary(filters, controller.signal),
       getCohortStats(filters, controller.signal),
       getCohortPoints(filters, controller.signal),
-      getCohortSamples(filters, { ...DEFAULT_TABLE, limit: PAGE_SIZE, offset: 0 }, controller.signal),
+      startSamples(filters, DEFAULT_TABLE, controller, true),
     ])
-      .then(([s, st, p, rows]) => {
+      .then(([s, st, p]) => {
         if (controller.signal.aborted) return;
         setSummary(s); setStats(st); setPoints(p.points);
-        setSamples(rows.rows); setSamplesTotal(rows.total);
         setError(null);
       })
       .catch((e: Error) => {
@@ -147,8 +175,7 @@ export function CohortPage() {
         setError(e.message);
       })
       .finally(() => {
-        if (controller.signal.aborted) return;
-        setLoading(false); setSamplesLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
   }, [filters]);
@@ -157,11 +184,8 @@ export function CohortPage() {
   useEffect(() => {
     if (samplesHandled.current) { samplesHandled.current = false; return; }
     const controller = new AbortController();
-    setSamplesLoading(true);
-    getCohortSamples(filters, { sort: table.sort, dir: table.dir, limit: PAGE_SIZE, offset: table.page * PAGE_SIZE }, controller.signal)
-      .then((r) => { setSamples(r.rows); setSamplesTotal(r.total); setError(null); })
-      .catch((e: Error) => { if (e.name !== "AbortError") setError(e.message); })
-      .finally(() => { if (!controller.signal.aborted) setSamplesLoading(false); });
+    startSamples(filters, table, controller, false)
+      .catch((e: Error) => { if (e.name !== "AbortError") setError(e.message); });
     return () => controller.abort();
   }, [filters, table]);
 
@@ -181,6 +205,8 @@ export function CohortPage() {
   const alpha = stats?.alpha ?? 0.05;
   const nUnavailable = rows.filter((r) => r.status === "unavailable").length;
   const empty = !loading && summary !== null && summary.n_samples === 0;
+  // The cohort fetch failed and left nothing to draw: say so instead of leaving skeletons up.
+  const failed = !loading && error !== null && summary === null;
   const description = cohortDescription(filters);
 
   return (
@@ -189,8 +215,6 @@ export function CohortPage() {
         title="Cohort analysis"
         subtitle="Explore immune cell frequencies and compare treatment response within a selected cohort."
       />
-      {error && <Card><p className="error">{error}</p></Card>}
-
       <CohortFilterCard
         filters={filters}
         options={options}
@@ -199,7 +223,12 @@ export function CohortPage() {
         onReset={() => applyFilters(DEFAULT_FILTERS)}
       />
 
-      {empty ? (
+      {failed ? (
+        <Card title="This cohort could not be loaded">
+          <p className="error">{error}</p>
+          <p className="note">Change a filter to try another cohort, or reset to the default one.</p>
+        </Card>
+      ) : empty ? (
         <Card title="Key metadata distribution">
           <div className="empty" aria-live="polite">
             <span>No samples match these filters.</span>
@@ -295,6 +324,7 @@ export function CohortPage() {
           </Card>
 
           <Card title="Matching samples" subtitle="Every sample in the selected cohort. Sorting, paging and the export cover all matching rows, not just the page shown.">
+            {error && <p className="error">{error}</p>}
             <DataTable
               columns={SAMPLE_COLUMNS}
               rows={samples}

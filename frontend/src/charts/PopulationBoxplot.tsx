@@ -76,17 +76,18 @@ export function PopulationBoxplot({ population, points, stats, timepoints, alpha
   // Category axes address positions by index, so use the category's index rather than its label.
   const annotations: Partial<Annotation>[] = days.map((day, index) => {
     const row = own.get(day);
-    const available = row?.status === "ok" && row.p_adj !== null;
-    const significant = available && row.p_adj! < alpha;
+    const adjusted = row?.status === "ok" ? row.p_adj : null;
+    const significant = adjusted !== null && adjusted < alpha;
+    const text = adjusted === null ? "unavailable" : `adj. p =<br>${formatP(adjusted)}`;
     return {
       x: index,
       xref: "x",
       y: -0.11,
       yref: "paper",
       yanchor: "top",
-      text: !available ? "unavailable" : significant ? `<b>adj. p =<br>${formatP(row.p_adj!)}</b>` : `adj. p =<br>${formatP(row!.p_adj!)}`,
+      text: significant ? `<b>${text}</b>` : text,
       showarrow: false,
-      font: { size: 12, color: !available ? MUTED : significant ? ACCENT : TEXT, family: "Inter, system-ui, sans-serif" },
+      font: { size: 12, color: adjusted === null ? MUTED : significant ? ACCENT : TEXT, family: "Inter, system-ui, sans-serif" },
       align: "center",
     };
   });
