@@ -69,11 +69,6 @@ def test_cohort_summary_matches_verification_numbers(pipeline_conn):
     assert table[("sex", "F")] == (312, 312)
 
 
-def test_form_answer_table(pipeline_conn):
-    row = q(pipeline_conn, "SELECT n_samples, mean_b_cell FROM form_answer")[0]
-    assert tuple(row) == (485, 10206.15)
-
-
 def test_pipeline_is_idempotent(loaded_db_path, tmp_path):
     """Runs on its own copy so the session-scoped pipeline DB that test_api reads is never rewritten mid-session."""
     import shutil
@@ -105,11 +100,12 @@ def test_no_population_is_significant_on_this_dataset(pipeline_conn):
     assert q(pipeline_conn, "SELECT COUNT(*) FROM response_stats WHERE significant = 1")[0][0] == 0  # in every stratum
 
 
-def test_module_entry_point_prints_form_answer(tmp_path):
+def test_module_entry_point_prints_report(tmp_path):
     db = tmp_path / "e2e.db"
     env = {"PATH": "", "CELL_COUNTS_DB": str(db)}
     load = subprocess.run([sys.executable, str(ROOT / "load_data.py")], cwd=ROOT, env=env, capture_output=True, text=True)
     assert load.returncode == 0, load.stderr
     run = subprocess.run([sys.executable, "-m", "analysis.pipeline"], cwd=ROOT, env=env, capture_output=True, text=True)
     assert run.returncode == 0, run.stderr
-    assert "Form answer: mean b_cell = 10206.15 (n = 485)" in run.stdout
+    assert "response_stats: 45 tests" in run.stdout
+    assert "no population reaches adjusted p" in run.stdout

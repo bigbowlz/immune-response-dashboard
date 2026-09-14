@@ -12,7 +12,7 @@ CSV_PATH = ROOT / "cell-count.csv"
 POPULATIONS: tuple[str, ...] = ("b_cell", "cd8_t_cell", "cd4_t_cell", "nk_cell", "monocyte")
 
 RAW_TABLES = ("subjects", "samples", "cell_counts")
-RESULT_TABLES = ("sample_summary", "response_stats", "cohort_summary", "form_answer", "pipeline_meta")
+RESULT_TABLES = ("sample_summary", "response_stats", "cohort_summary", "pipeline_meta")
 
 SCHEMA_SQL = """
 CREATE TABLE subjects (
@@ -75,12 +75,6 @@ CREATE TABLE cohort_summary (
     PRIMARY KEY (breakdown, category)
 );
 
-CREATE TABLE form_answer (
-    question    TEXT PRIMARY KEY,
-    n_samples   INTEGER NOT NULL,
-    mean_b_cell REAL NOT NULL
-);
-
 -- Provenance of the last pipeline run: generated_at, csv_sha256, csv_rows, python_version, pandas_version, scipy_version.
 CREATE TABLE pipeline_meta (
     key   TEXT PRIMARY KEY,
@@ -111,8 +105,15 @@ def connect(path: str | os.PathLike | None = None) -> sqlite3.Connection:
 
 
 def create_schema(conn: sqlite3.Connection) -> None:
-    """Drop every table and recreate it, so the loader is idempotent."""
+    """Drop every table and recreate it, so the loader is idempotent.
+
+    Every user table is dropped, not just the ones this version knows about, so a database written
+    by an older schema never keeps tables the current pipeline no longer produces.
+    """
     with conn:
-        for table in RESULT_TABLES + tuple(reversed(RAW_TABLES)):
-            conn.execute(f"DROP TABLE IF EXISTS {table}")
+        conn.execute("PRAGMA foreign_keys = OFF")
+        existing = [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")]
+        for table in existing:
+            conn.execute(f'DROP TABLE IF EXISTS "{table}"')
+        conn.execute("PRAGMA foreign_keys = ON")
         conn.executescript(SCHEMA_SQL)

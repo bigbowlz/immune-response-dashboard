@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { getFormAnswer, getSubsetOptions, getSubsets } from "../api";
+import { getSubsetOptions, getSubsets } from "../api";
 import { Card } from "../components/Card";
 import { PageHeader } from "../components/PageHeader";
-import type { BreakdownRow, FilterKey, FormAnswer, SubsetFilters, SubsetOptions, SubsetsResponse } from "../types";
+import type { BreakdownRow, FilterKey, SubsetFilters, SubsetOptions, SubsetsResponse } from "../types";
 
 const DEFAULTS: SubsetFilters = { condition: "melanoma", treatment: "miraclib", sample_type: "PBMC", time_from_treatment_start: "0" };
 const FILTER_LABELS: Record<FilterKey, string> = {
@@ -36,13 +36,11 @@ export function SubsetsPage() {
   const [options, setOptions] = useState<SubsetOptions | null>(null);
   const [filters, setFilters] = useState<SubsetFilters>(DEFAULTS);
   const [data, setData] = useState<SubsetsResponse | null>(null);
-  const [answer, setAnswer] = useState<FormAnswer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getSubsetOptions().then(setOptions).catch((e: Error) => setError(e.message));
-    getFormAnswer().then(setAnswer).catch(() => setAnswer(null));
   }, []);
 
   // One request per filter change; an older response can never overwrite a newer one.
@@ -89,7 +87,7 @@ export function SubsetsPage() {
           </div>
         )}
         {data && data.n_samples > 0 && (
-          <div style={{ opacity: loading ? 0.6 : 1, transition: "opacity 120ms ease-out" }} aria-busy={loading}>
+          <div className={loading ? "refreshable refreshable--busy" : "refreshable"} aria-busy={loading}>
             <p className="headline"><span className="metric">{data.n_samples.toLocaleString()}</span> samples from <span className="metric">{data.n_subjects.toLocaleString()}</span> subjects</p>
             <div className="grid">
               <BreakdownCard title="Project" rows={data.breakdowns.project} />
@@ -100,11 +98,6 @@ export function SubsetsPage() {
           </div>
         )}
       </Card>
-      {answer && (
-        <Card title="Melanoma males, responders at baseline" subtitle={answer.question}>
-          <p className="headline"><span className="metric">{answer.mean_b_cell.toFixed(2)}</span> mean B cells across {answer.n_samples} samples (all sample and treatment types)</p>
-        </Card>
-      )}
     </>
   );
 }

@@ -65,4 +65,3 @@ export interface SubsetsResponse {
 }
 export type SubsetOptions = Record<FilterKey, Array<string | number>>;
 
-export interface FormAnswer { question: string; n_samples: number; mean_b_cell: number }

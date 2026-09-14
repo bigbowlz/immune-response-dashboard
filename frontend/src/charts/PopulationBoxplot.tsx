@@ -5,11 +5,21 @@ import { POPULATION_LABELS, type Population, type ResponsePoint, type ResponseSt
 
 const Plot = createPlotlyComponent(Plotly);
 
-const FILL = { no: "#7f8ce0", yes: "#4caf7d" } as const;
-const LINE = { no: "#4c5cc7", yes: "#2e7d55" } as const;
+// Colours come from the stylesheet's custom properties so the chart and the rest of the page share one palette.
+function cssVar(name: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+// Resolved at render time, not at module load, so the stylesheet is guaranteed to be applied first.
+function readPalette() {
+  return {
+    FILL: { no: cssVar("--nonresponder", "#7f8ce0"), yes: cssVar("--responder", "#4caf7d") } as const,
+    LINE: { no: cssVar("--nonresponder-line", "#4c5cc7"), yes: cssVar("--responder-line", "#2e7d55") } as const,
+    TEXT: cssVar("--text", "#1f2328"),
+    ACCENT: cssVar("--accent", "#d6453d"),
+  };
+}
 const SYMBOL = { no: "circle", yes: "diamond" } as const;
-const TEXT = "#1f2328";
-const ACCENT = "#d6453d";
 
 export function formatP(p: number): string {
   if (p < 0.001) return "< 0.001";
@@ -31,6 +41,7 @@ interface Props {
 }
 
 export function PopulationBoxplot({ population, points, stats, alpha, sharedYMax }: Props) {
+  const { FILL, LINE, TEXT, ACCENT } = readPalette();
   const own = stats.filter((r) => r.population === population).sort((a, b) => a.time_from_treatment_start - b.time_from_treatment_start);
   const days = own.map((r) => r.time_from_treatment_start);
   const categories = days.map(dayLabel);
@@ -61,9 +72,10 @@ export function PopulationBoxplot({ population, points, stats, alpha, sharedYMax
   const annotations: Partial<Annotation>[] = own.map((r) => ({
     x: categories.indexOf(dayLabel(r.time_from_treatment_start)),
     xref: "x",
-    y: -0.19,
+    y: -0.11,
     yref: "paper",
-    text: r.p_adj < alpha ? `<b>adj. p = ${formatP(r.p_adj)}</b>` : `adj. p = ${formatP(r.p_adj)}`,
+    yanchor: "top",
+    text: r.p_adj < alpha ? `<b>adj. p =<br>${formatP(r.p_adj)}</b>` : `adj. p =<br>${formatP(r.p_adj)}`,
     showarrow: false,
     font: { size: 12, color: r.p_adj < alpha ? ACCENT : TEXT, family: "Inter, system-ui, sans-serif" },
     align: "center",
@@ -72,14 +84,14 @@ export function PopulationBoxplot({ population, points, stats, alpha, sharedYMax
   const layout: Partial<Layout> = {
     title: { text: POPULATION_LABELS[population], font: { size: 14, color: TEXT }, x: 0.02, xanchor: "left" },
     boxmode: "group",
-    margin: { l: 52, r: 12, t: 36, b: 96 },
+    margin: { l: 52, r: 12, t: 36, b: 110 },
     height: 380,
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "#ffffff",
     font: { family: "Inter, system-ui, sans-serif", size: 12, color: TEXT },
     xaxis: { type: "category", categoryorder: "array", categoryarray: categories, showgrid: false, tickfont: { size: 12 } },
     yaxis: { title: { text: "Percent of total" }, gridcolor: "#eef0f3", zeroline: false, rangemode: "tozero", range: sharedYMax ? [0, sharedYMax] : undefined },
-    legend: { orientation: "h", y: -0.34, x: 0.5, xanchor: "center" },
+    legend: { orientation: "h", y: -0.4, x: 0.5, xanchor: "center" },
     annotations,
     showlegend: true,
   };

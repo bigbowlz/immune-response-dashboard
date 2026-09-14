@@ -52,7 +52,7 @@ def test_no_missing_counts_and_blank_response_is_null(loaded):
 
 def test_result_tables_exist_but_are_empty(loaded):
     conn, _ = loaded
-    for t in ("sample_summary", "response_stats", "cohort_summary", "form_answer", "pipeline_meta"):
+    for t in ("sample_summary", "response_stats", "cohort_summary", "pipeline_meta"):
         assert conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] == 0
 
 
@@ -131,3 +131,14 @@ def test_load_data_script_creates_db_at_env_path(tmp_path):
     assert "10500" in result.stdout
     conn = sqlite3.connect(db)
     assert conn.execute("SELECT COUNT(*) FROM samples").fetchone()[0] == 10500
+
+
+def test_create_schema_drops_tables_from_older_schemas(tmp_path):
+    conn = schema.connect(tmp_path / "old.db")
+    conn.execute("CREATE TABLE leftover (x INTEGER)")
+    conn.commit()
+    schema.create_schema(conn)
+    names = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    conn.close()
+    assert "leftover" not in names
+    assert set(schema.RAW_TABLES + schema.RESULT_TABLES) <= names
