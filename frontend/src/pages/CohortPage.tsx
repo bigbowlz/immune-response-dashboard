@@ -63,7 +63,7 @@ function headline(rows: CohortStat[], alpha: number): ReactNode {
 }
 
 
-const STAT_COLUMNS = (alpha: number): ColumnDef<CohortStat>[] => [
+const STAT_COLUMNS = (alpha: number, nTests?: number): ColumnDef<CohortStat>[] => [
   { key: "population", label: "Population", format: (v) => POPULATION_LABELS[v as Population] },
   { key: "time_from_treatment_start", label: "Day", numeric: true },
   { key: "n_responders", label: "n resp.", numeric: true, format: (v) => Number(v).toLocaleString() },
@@ -73,11 +73,12 @@ const STAT_COLUMNS = (alpha: number): ColumnDef<CohortStat>[] => [
   { key: "u_statistic", label: "U", numeric: true, help: "Two-sided Mann-Whitney U test per population per selected timepoint, responders against non-responders.", format: (v) => (v === null ? "—" : Number(v).toLocaleString()) },
   // An unavailable cell has no p-values: the reason takes their place.
   { key: "p_raw", label: "p (raw)", numeric: true, render: (v, row) => (row.status === "ok" && v !== null ? formatP(Number(v)) : <span className="reason">{row.reason}</span>) },
-  { key: "p_adj", label: "p (BH-adjusted)", numeric: true, render: (v, row) => (row.status === "ok" && v !== null ? <span className={Number(v) < alpha ? "sig" : undefined}>{formatP(Number(v))}</span> : "—") },
+  { key: "p_adj", label: "p (BH-adjusted)", numeric: true, help: nTests === undefined ? undefined : `Benjamini–Hochberg across the ${nTests.toLocaleString()} valid ${nTests === 1 ? "test" : "tests"} in this cohort.`, render: (v, row) => (row.status === "ok" && v !== null ? <span className={Number(v) < alpha ? "sig" : undefined}>{formatP(Number(v))}</span> : "—") },
   { key: "effect_size", label: "Cliff's delta", numeric: true, help: "Positive when responders have the higher frequency.", format: (v) => (v === null ? "—" : formatDelta(Number(v))) },
   {
     key: "status",
     label: "Significance",
+    help: `Significant means adjusted p below ${alpha}.`,
     render: (_v, row) =>
       row.status === "unavailable"
         ? <Chip tone="neutral">Unavailable</Chip>
@@ -220,7 +221,6 @@ export function CohortPage() {
   // so wide cohorts fall back to outliers only. Based on samples with a recorded response (what the
   // boxplots actually draw), not the raw sample count.
   const wideCohort = stats !== null && stats.n_samples - stats.n_missing_response > 3000;
-  const nUnavailable = rows.filter((r) => r.status === "unavailable").length;
   const empty = !loading && summary !== null && summary.n_samples === 0;
   // The cohort fetch failed and left nothing to draw: say so instead of leaving skeletons up.
   const failed = !loading && error !== null && summary === null;
@@ -353,7 +353,7 @@ export function CohortPage() {
           >
             <div className="stats">
             <DataTable
-              columns={STAT_COLUMNS(alpha)}
+              columns={STAT_COLUMNS(alpha, stats?.n_tests)}
               rows={rows}
               pageSize={rows.length || 15}
               loading={loading}
@@ -361,11 +361,6 @@ export function CohortPage() {
               rowKey={(row) => `${row.population}-${row.time_from_treatment_start}`}
             />
             </div>
-            {stats && (
-              <p className="note" style={{ marginTop: 10 }}>
-                Benjamini–Hochberg across the {stats.n_tests.toLocaleString()} valid {stats.n_tests === 1 ? "test" : "tests"} in this cohort ({nUnavailable.toLocaleString()} unavailable). Significant means adjusted p below {alpha}.
-              </p>
-            )}
           </Card>
 
           {samplesCard}
