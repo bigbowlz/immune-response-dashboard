@@ -116,7 +116,10 @@ export function DataTable<T extends object>(props: Props<T>) {
         </table>
       </div>
       <div className="table-footer">
-        <span aria-live="polite">Total Rows: {total.toLocaleString()}</span>
+        <span className="table-footer__counts" aria-live="polite">
+          <span>Rows on this page: {visible.length === 0 ? "0" : `${(current * pageSize + 1).toLocaleString()}–${(current * pageSize + visible.length).toLocaleString()}`}</span>
+          <span>Total Rows: {total.toLocaleString()}</span>
+        </span>
         {pages > 1 && (
           <span className="pager">
             <button onClick={() => setPage(current - 1)} disabled={loading || current === 0} aria-label="Previous page">Prev</button>
