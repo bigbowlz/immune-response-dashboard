@@ -1,5 +1,6 @@
 import { useId } from "react";
 import { Card } from "./Card";
+import { Select } from "./Select";
 import { dayLabel } from "../charts/PopulationBoxplot";
 import type { CohortFilterKey, CohortFilters, CohortOptions } from "../types";
 
@@ -50,24 +51,14 @@ export function CohortFilterCard({ filters, options, onChange, onBaseline, onRes
           {FILTER_ORDER.map((key) => (
             <fieldset className="field" key={key}>
               <legend className="field__label">{FILTER_LABELS[key]}</legend>
-              {options ? (
-                <select
-                  id={`${id}-${key}`}
-                  aria-label={FILTER_LABELS[key]}
-                  value={filters[key]}
-                  onChange={(e) => onChange({ ...filters, [key]: e.target.value })}
-                >
-                  <option value="all">All</option>
-                  {options[key].map((v) => (
-                    <option key={String(v)} value={String(v)}>{filterValueLabel(key, String(v))}</option>
-                  ))}
-                </select>
-              ) : (
-                // Blank until the option lists arrive, so the control never shows a value that is about to change.
-                <select id={`${id}-${key}`} aria-label={FILTER_LABELS[key]} value="" disabled onChange={() => undefined}>
-                  <option value="" />
-                </select>
-              )}
+              <Select
+                id={`${id}-${key}`}
+                label={FILTER_LABELS[key]}
+                value={options ? filters[key] : ""}
+                disabled={!options}
+                options={options ? [{ value: "all", label: "All" }, ...options[key].map((v) => ({ value: String(v), label: filterValueLabel(key, String(v)) }))] : []}
+                onChange={(value) => onChange({ ...filters, [key]: value })}
+              />
             </fieldset>
           ))}
           <div className="field-actions">
