@@ -26,6 +26,6 @@ jobs:
           make dashboard &
           for i in $(seq 1 30); do curl -sf localhost:8000/api/health >/dev/null && break; sleep 1; done
           curl -sf localhost:8000/api/health
-          curl -sf 'localhost:8000/api/subsets?condition=melanoma&treatment=miraclib&sample_type=PBMC&time_from_treatment_start=0' | grep -q '"n_samples":656'
+          curl -sf 'localhost:8000/api/cohort/summary' | grep -q '"n_samples":1968'
           curl -sf localhost:8000/ | grep -q '<div id="root">'
           kill %1

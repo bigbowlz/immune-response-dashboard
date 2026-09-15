@@ -2,28 +2,34 @@ import { useEffect, useState } from "react";
 import { ApiError, getHealth } from "./api";
 import { Card } from "./components/Card";
 import { PAGES, Sidebar, type PageKey } from "./components/Sidebar";
+import { CohortPage } from "./pages/CohortPage";
 import { FrequenciesPage } from "./pages/FrequenciesPage";
-import { ResponsePage } from "./pages/ResponsePage";
-import { SubsetsPage } from "./pages/SubsetsPage";
 import type { Health } from "./types";
 
-const DEFAULT_PAGE: PageKey = "response";
+const DEFAULT_PAGE: PageKey = "cohort";
 
-function pageFromHash(): PageKey {
+/** The page named by the hash, or null for an empty, retired (`#/response`, `#/subsets`) or unknown hash. */
+function pageFromHash(): PageKey | null {
   const key = window.location.hash.replace(/^#\/?/, "");
-  return PAGES.some((p) => p.key === key) ? (key as PageKey) : DEFAULT_PAGE;
+  return PAGES.some((p) => p.key === key) ? (key as PageKey) : null;
 }
 
 type Gate = { state: "checking" } | { state: "ok"; health: Health } | { state: "no-data"; detail: string } | { state: "error"; detail: string };
 
 export default function App() {
-  const [page, setPage] = useState<PageKey>(pageFromHash);
+  const [page, setPage] = useState<PageKey>(() => pageFromHash() ?? DEFAULT_PAGE);
   const [gate, setGate] = useState<Gate>({ state: "checking" });
 
   useEffect(() => {
-    const onHash = () => setPage(pageFromHash());
+    // Anything that is not a live page -- no hash, the retired response/subsets routes, a typo --
+    // is replaced with the default so the address bar never shows a route that does not exist.
+    const onHash = () => {
+      const next = pageFromHash();
+      setPage(next ?? DEFAULT_PAGE);
+      if (next === null) window.location.replace(`#/${DEFAULT_PAGE}`);
+    };
+    onHash();
     window.addEventListener("hashchange", onHash);
-    if (!window.location.hash) window.location.replace(`#/${DEFAULT_PAGE}`);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
@@ -60,9 +66,8 @@ export default function App() {
             <p className="error">{gate.detail}</p>
           </Card>
         )}
+        {gate.state === "ok" && page === "cohort" && <CohortPage />}
         {gate.state === "ok" && page === "frequencies" && <FrequenciesPage />}
-        {gate.state === "ok" && page === "response" && <ResponsePage />}
-        {gate.state === "ok" && page === "subsets" && <SubsetsPage />}
       </main>
     </div>
   );

@@ -1,9 +1,8 @@
-export type PageKey = "frequencies" | "response" | "subsets";
+export type PageKey = "cohort" | "frequencies";
 
 export const PAGES: Array<{ key: PageKey; label: string }> = [
-  { key: "response", label: "Responder comparison" },
   { key: "frequencies", label: "Cell frequencies" },
-  { key: "subsets", label: "Cohort subsets" },
+  { key: "cohort", label: "Cohort analysis" },
 ];
 
 export function Sidebar({ active, generatedAt }: { active: PageKey; generatedAt?: string }) {
@@ -21,9 +20,10 @@ export function Sidebar({ active, generatedAt }: { active: PageKey; generatedAt?
           {item.label}
         </a>
       ))}
-      {generatedAt && (
-        <div className="sidebar__footer">Pipeline run {new Date(generatedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</div>
-      )}
+      <div className="sidebar__footer">
+        {generatedAt && <div>Pipeline run {new Date(generatedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</div>}
+        <div className="sidebar__signature">Built by Wanli Zhou</div>
+      </div>
     </nav>
   );
 }

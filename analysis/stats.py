@@ -14,9 +14,9 @@ from analysis.schema import POPULATIONS
 
 ALPHA = 0.05
 SUMMARY_COLUMNS = ["sample", "total_count", "population", "count", "percentage"]
-STATS_COLUMNS = [
+CELL_COLUMNS = [
     "population", "time_from_treatment_start", "n_responders", "n_nonresponders",
-    "median_responders", "median_nonresponders", "u_statistic", "p_raw", "p_adj", "effect_size", "significant",
+    "median_responders", "median_nonresponders", "u_statistic", "p_raw", "effect_size", "status", "reason",
 ]
 
 
@@ -68,22 +68,61 @@ def benjamini_hochberg(pvalues: Sequence[float]) -> list[float]:
     return [float(p) for p in sps.false_discovery_control(list(pvalues), method="bh")]
 
 
-def compare_response_groups(points: pd.DataFrame) -> pd.DataFrame:
-    """Part 3: responders vs non-responders, tested separately for every population at every timepoint."""
+_UNAVAILABLE_STATS = {
+    "median_responders": None,
+    "median_nonresponders": None,
+    "u_statistic": None,
+    "p_raw": None,
+    "effect_size": None,
+}
+
+
+def compare_cells(points: pd.DataFrame, timepoints: Sequence[int]) -> pd.DataFrame:
+    """One row per population (POPULATIONS order) per timepoint (given order).
+
+    Never raises: a cell that cannot be tested is recorded as unavailable with a reason instead of
+    running the comparison. `points` may be empty but must still carry the `population`,
+    `time_from_treatment_start`, `subject`, `response` and `percentage` columns.
+    """
     records = []
-    timepoints = sorted(points["time_from_treatment_start"].unique())
     for population in POPULATIONS:
         for day in timepoints:
+            day = int(day)
             cell = points[(points["population"] == population) & (points["time_from_treatment_start"] == day)]
-            try:
-                comparison = compare_groups(
-                    cell.loc[cell["response"] == "yes", "percentage"],
-                    cell.loc[cell["response"] == "no", "percentage"],
-                )
-            except ValueError as exc:
-                raise ValueError(f"{population} at day {day}: {exc}") from exc
-            records.append({"population": population, "time_from_treatment_start": int(day), **comparison.__dict__})
-    frame = pd.DataFrame.from_records(records)
-    frame["p_adj"] = benjamini_hochberg(frame["p_raw"])
-    frame["significant"] = (frame["p_adj"] < ALPHA).astype(int)
-    return frame[STATS_COLUMNS]
+            responders = cell.loc[cell["response"] == "yes", "percentage"]
+            nonresponders = cell.loc[cell["response"] == "no", "percentage"]
+            base = {
+                "population": population,
+                "time_from_treatment_start": day,
+                "n_responders": int(len(responders)),
+                "n_nonresponders": int(len(nonresponders)),
+                **_UNAVAILABLE_STATS,
+            }
+            if cell.empty:
+                records.append({**base, "status": "unavailable", "reason": "no samples match this cohort at this timepoint"})
+            elif cell["subject"].duplicated().any():
+                records.append({**base, "status": "unavailable", "reason": "a subject contributes more than one sample to this test"})
+            elif responders.empty:
+                records.append({**base, "status": "unavailable", "reason": "no responders (response = yes) at this timepoint"})
+            elif nonresponders.empty:
+                records.append({**base, "status": "unavailable", "reason": "no non-responders (response = no) at this timepoint"})
+            else:
+                comparison = compare_groups(responders, nonresponders)
+                records.append({**base, **comparison.__dict__, "status": "ok", "reason": None})
+    return pd.DataFrame.from_records(records, columns=CELL_COLUMNS)
+
+
+def adjust_family(cells: pd.DataFrame) -> pd.DataFrame:
+    """Copy of `cells` with `p_adj` (BH over the ok rows, in row order; NaN elsewhere) and `significant`."""
+    frame = cells.copy()
+    ok = frame["status"] == "ok"
+    p_adj = pd.Series(float("nan"), index=frame.index, dtype=float)
+    if ok.any():
+        p_adj.loc[ok] = benjamini_hochberg(frame.loc[ok, "p_raw"])
+    frame["p_adj"] = p_adj
+    frame["significant"] = (ok & (frame["p_adj"] < ALPHA)).astype(int)
+    return frame
+
+
+def family_size(cells: pd.DataFrame) -> int:
+    return int((cells["status"] == "ok").sum())
