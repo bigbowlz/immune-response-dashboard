@@ -48,8 +48,14 @@ main { flex: 1; min-width: 0; padding: 28px 32px 48px; }
 .card__subtitle { margin: 2px 0 0; color: var(--muted); font-size: 13px; max-width: 80ch; }
 .card--nested { box-shadow: none; border: 1px solid var(--line); padding: 14px 16px; margin: 0; }
 .card--nested { overflow-x: auto; container-type: inline-size; }
-.card--nested table.data th { white-space: nowrap; padding: 6px 8px; vertical-align: bottom; }
-.card--nested table.data td { white-space: normal; padding: 6px 8px; }
+/* Fixed column widths so every breakdown table has the same geometry inside its card, whatever its labels. */
+.card--nested table.data { table-layout: fixed; width: 100%; }
+.card--nested table.data th:nth-child(1) { width: 31%; }
+.card--nested table.data th:nth-child(2) { width: 21%; }
+.card--nested table.data th:nth-child(3) { width: 23%; }
+.card--nested table.data th:nth-child(4) { width: 25%; }
+.card--nested table.data th { white-space: nowrap; padding: 6px 6px; vertical-align: bottom; }
+.card--nested table.data td { white-space: normal; padding: 6px 6px; overflow-wrap: anywhere; }
 .th-line { display: block; line-height: 1.25; }
 /* A narrow card (one per row on a phone) shrinks its table rather than scrolling it. */
 @container (max-width: 360px) {
