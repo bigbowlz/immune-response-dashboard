@@ -8,6 +8,8 @@ export interface ColumnDef<T> {
   numeric?: boolean;
   format?: (value: T[keyof T], row: T) => string;
   render?: (value: T[keyof T], row: T) => ReactNode;
+  /** Optional explanation shown in a tooltip beside the column name. */
+  help?: string;
 }
 
 interface Props<T> {
@@ -88,6 +90,7 @@ export function DataTable<T extends object>(props: Props<T>) {
                     <button type="button" className="th-sort" onClick={() => toggleSort(c.key)} disabled={loading} aria-label={`Sort by ${c.label}`}>
                       {c.label}{active ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
                     </button>
+                    {c.help && <button type="button" className="help help--small help--down" aria-label={c.help} data-tip={c.help}>?</button>}
                   </th>
                 );
               })}

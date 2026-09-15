@@ -58,11 +58,11 @@ const STAT_COLUMNS = (alpha: number): ColumnDef<CohortStat>[] => [
   { key: "n_nonresponders", label: "n non-resp.", numeric: true, format: (v) => Number(v).toLocaleString() },
   { key: "median_responders", label: "Median resp. (%)", numeric: true, format: (v) => (v === null ? "—" : Number(v).toFixed(2)) },
   { key: "median_nonresponders", label: "Median non-resp. (%)", numeric: true, format: (v) => (v === null ? "—" : Number(v).toFixed(2)) },
-  { key: "u_statistic", label: "U", numeric: true, format: (v) => (v === null ? "—" : Number(v).toLocaleString()) },
+  { key: "u_statistic", label: "U", numeric: true, help: "Two-sided Mann-Whitney U test per population per selected timepoint, responders against non-responders.", format: (v) => (v === null ? "—" : Number(v).toLocaleString()) },
   // An unavailable cell has no p-values: the reason takes their place.
   { key: "p_raw", label: "p (raw)", numeric: true, render: (v, row) => (row.status === "ok" && v !== null ? formatP(Number(v)) : <span className="reason">{row.reason}</span>) },
   { key: "p_adj", label: "p (BH-adjusted)", numeric: true, render: (v, row) => (row.status === "ok" && v !== null ? <span className={Number(v) < alpha ? "sig" : undefined}>{formatP(Number(v))}</span> : "—") },
-  { key: "effect_size", label: "Cliff's delta", numeric: true, format: (v) => (v === null ? "—" : formatDelta(Number(v))) },
+  { key: "effect_size", label: "Cliff's delta", numeric: true, help: "Positive when responders have the higher frequency.", format: (v) => (v === null ? "—" : formatDelta(Number(v))) },
   {
     key: "status",
     label: "Status",
@@ -337,8 +337,8 @@ export function CohortPage() {
 
           <Card
             title="Statistics"
-            subtitle="One two-sided Mann-Whitney U test per population per selected timepoint, responders against non-responders. Cliff's delta is positive when responders have the higher frequency."
           >
+            <div className="stats">
             <DataTable
               columns={STAT_COLUMNS(alpha)}
               rows={rows}
@@ -347,6 +347,7 @@ export function CohortPage() {
               emptyText="No statistics for this cohort."
               rowKey={(row) => `${row.population}-${row.time_from_treatment_start}`}
             />
+            </div>
             {stats && (
               <p className="note" style={{ marginTop: 10 }}>
                 Benjamini–Hochberg across the {stats.n_tests.toLocaleString()} valid {stats.n_tests === 1 ? "test" : "tests"} in this cohort ({nUnavailable.toLocaleString()} unavailable). Significant means adjusted p below {alpha}.
