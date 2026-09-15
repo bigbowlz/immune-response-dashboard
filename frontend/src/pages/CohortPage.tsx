@@ -264,7 +264,8 @@ export function CohortPage() {
         filters={filters}
         options={options}
         onChange={applyFilters}
-        onBaseline={() => applyFilters({ ...filters, time_from_treatment_start: "0" })}
+        isDefault={(Object.keys(DEFAULT_FILTERS) as Array<keyof CohortFilters>).every((k) => filters[k] === DEFAULT_FILTERS[k])}
+        onBaseline={(on) => applyFilters({ ...filters, time_from_treatment_start: on ? "0" : "all" })}
         onReset={() => applyFilters(DEFAULT_FILTERS)}
       />
 
@@ -285,14 +286,13 @@ export function CohortPage() {
         </Card>
       ) : (
         <>
-          <Card title="Key metadata distribution" subtitle={description}>
+          <Card title="Key metadata distribution">
             {loading || !summary ? (
               <div className="skeleton skeleton--block" aria-hidden="true" />
             ) : (
               <>
                 <p className="headline">
-                  <span><span className="metric">{summary.n_samples.toLocaleString()}</span> samples</span>
-                  <span>from <span className="metric">{summary.n_subjects.toLocaleString()}</span> subjects</span>
+                  <span className="metric">{summary.n_samples.toLocaleString()}</span> samples from <span className="metric">{summary.n_subjects.toLocaleString()}</span> subjects
                 </p>
                 <div className="grid">
                   <BreakdownCard title="Project" rows={summary.breakdowns.project} />

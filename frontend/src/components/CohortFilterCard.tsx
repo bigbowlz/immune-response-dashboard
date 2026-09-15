@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { Card } from "./Card";
 import { Select } from "./Select";
+import { Toggle } from "./Toggle";
 import { dayLabel } from "../charts/PopulationBoxplot";
 import type { CohortFilterKey, CohortFilters, CohortOptions } from "../types";
 
@@ -29,11 +30,12 @@ interface Props {
   filters: CohortFilters;
   options: CohortOptions | null;
   onChange: (next: CohortFilters) => void;
-  onBaseline: () => void;
+  isDefault: boolean;
+  onBaseline: (on: boolean) => void;
   onReset: () => void;
 }
 
-export function CohortFilterCard({ filters, options, onChange, onBaseline, onReset }: Props) {
+export function CohortFilterCard({ filters, options, onChange, isDefault, onBaseline, onReset }: Props) {
   const id = useId();
   return (
     <Card>
@@ -61,9 +63,9 @@ export function CohortFilterCard({ filters, options, onChange, onBaseline, onRes
               />
             </fieldset>
           ))}
-          <div className="field-actions">
-            <button type="button" className="button" onClick={onBaseline} disabled={filters.time_from_treatment_start === "0"}>Baseline only</button>
-            <button type="button" className="button" onClick={onReset}>Reset to default cohort</button>
+          <div className="toggles">
+            <Toggle label="Baseline only" checked={filters.time_from_treatment_start === "0"} disabled={!options} onChange={onBaseline} />
+            <Toggle label="Default cohort" checked={isDefault} disabled={!options} onChange={(on) => { if (on) onReset(); }} />
           </div>
         </div>
       </div>
