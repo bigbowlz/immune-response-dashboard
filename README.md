@@ -105,28 +105,6 @@ The hosted copy serves a `cell_counts.db` committed to the repo; a local run reg
 
 **Baseline and post-treatment days.** Day 0 samples are taken before treatment, so a day-0 difference is an association with the response recorded later, not evidence that the population predicts it. Day 7 and day 14 samples are taken after treatment started, so a difference there describes how the two response groups already differ; by itself it shows neither prediction nor that the treatment caused the difference. The charts, the finding line and the "Baseline only" tooltip label day 0 as baseline, and that switch narrows the cohort to day 0 in one click.
 
-`response_stats` for the default cohort (melanoma, miraclib, PBMC, all projects) with all timepoints selected, so the Benjamini-Hochberg correction runs across these 15 tests:
-
-| Population | Day | n resp. | n non-resp. | Median resp. | Median non-resp. | p (raw) | p (adjusted) | Cliff's delta | Significant |
-| ---------- | --- | ------- | ----------- | ------------ | ---------------- | ------- | ------------ | ------------- | ----------- |
-| b_cell     | 0   | 331     | 325         | 9.79         | 9.76             | 0.5485  | 0.8089       | 0.027         | no          |
-| cd4_t_cell | 0   | 331     | 325         | 29.63        | 29.53            | 0.7964  | 0.8533       | 0.012         | no          |
-| cd8_t_cell | 0   | 331     | 325         | 24.4         | 24.6             | 0.5140  | 0.8089       | -0.029        | no          |
-| monocyte   | 0   | 331     | 325         | 19.61        | 20.29            | 0.2114  | 0.5285       | -0.056        | no          |
-| nk_cell    | 0   | 331     | 325         | 15.0         | 14.89            | 0.8853  | 0.8853       | -0.007        | no          |
-| b_cell     | 7   | 331     | 325         | 9.23         | 9.97             | 0.1439  | 0.4316       | -0.066        | no          |
-| cd4_t_cell | 7   | 331     | 325         | 30.45        | 29.55            | 0.0297  | 0.2228       | 0.098         | no          |
-| cd8_t_cell | 7   | 331     | 325         | 24.7         | 24.77            | 0.6377  | 0.8089       | -0.021        | no          |
-| monocyte   | 7   | 331     | 325         | 19.6         | 20.03            | 0.4841  | 0.8089       | -0.032        | no          |
-| nk_cell    | 7   | 331     | 325         | 14.42        | 14.8             | 0.1378  | 0.4316       | -0.067        | no          |
-| b_cell     | 14  | 331     | 325         | 9.11         | 9.84             | 0.0144  | 0.2162       | -0.110        | no          |
-| cd4_t_cell | 14  | 331     | 325         | 30.79        | 30.07            | 0.0755  | 0.3774       | 0.080         | no          |
-| cd8_t_cell | 14  | 331     | 325         | 25.08        | 24.56            | 0.7407  | 0.8533       | 0.015         | no          |
-| monocyte   | 14  | 331     | 325         | 19.62        | 19.75            | 0.6471  | 0.8089       | -0.021        | no          |
-| nk_cell    | 14  | 331     | 325         | 14.35        | 14.65            | 0.3147  | 0.6744       | -0.045        | no          |
-
-The honest result is a null: nothing reaches adjusted p < 0.05. The two smallest adjusted p-values are both around 0.22 — b_cell at day 14 (0.2162, lower in responders) and cd4_t_cell at day 7 (0.2228, higher in responders).
-
 **Project as a filter.** The default cohort spans two projects (prj1: 195 responders and 189 non-responders; prj3: 136 and 136), and selecting one of them selects that cohort's own precomputed family with its own BH correction rather than re-slicing the pooled numbers. The result is null within each project too — the smallest adjusted p is 0.400 in prj1 (b_cell, day 14) and 0.560 in prj3 (monocyte, day 0). Those results are consistent with the pooled one; that is all that can be said, since they do not rule out confounding or an effect masked inside a project.
 
 **Limitations.** The comparison is not stratified by sex or age, which would be the next checks to run if any population had shown a signal. Cohorts are limited to the five selectors, since those are the combinations the pipeline precomputes. And a null result across a family of small effects is not evidence that no difference exists; it is evidence that this dataset does not show one.
