@@ -23,19 +23,8 @@ const PAGE_SIZE = 50;
 interface TableState { sort: SampleColumn; dir: SortDir; page: number }
 const DEFAULT_TABLE: TableState = { sort: "sample", dir: "asc", page: 0 };
 
-const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const populationLabel = (s: CohortStat) => POPULATION_LABELS[s.population];
 const direction = (delta: number) => (delta >= 0 ? "higher" : "lower");
-
-/** Plain-language description of the selected cohort, used in the explanatory copy. */
-function cohortDescription(f: CohortFilters): string {
-  const subjects = f.condition === "healthy" && f.treatment === "none"
-    ? "healthy subjects (no treatment)"
-    : `${f.condition === "all" ? "all conditions" : f.condition} patients treated with ${f.treatment === "all" ? "all treatments" : f.treatment === "none" ? "no treatment" : f.treatment}`;
-  const sampleType = f.sample_type === "all" ? "all sample types" : f.sample_type;
-  const project = f.project === "all" ? "all projects" : `project ${f.project}`;
-  return capitalise(`${subjects}, ${sampleType} samples, ${project}`);
-}
 
 /** One sentence that holds whether or not anything is significant, and names the reason when nothing ran. */
 function headline(rows: CohortStat[], alpha: number): ReactNode {
@@ -61,15 +50,6 @@ function headline(rows: CohortStat[], alpha: number): ReactNode {
   );
 }
 
-/** The note that keeps baseline associations and post-treatment differences apart. */
-function interpretationNote(days: number[]): string {
-  const hasBaseline = days.includes(0);
-  const later = days.filter((d) => d !== 0);
-  const parts: string[] = [];
-  if (hasBaseline) parts.push("Day 0 samples are taken before treatment, so a day 0 difference is an association with the response recorded later, not evidence that the population predicts it.");
-  if (later.length > 0) parts.push(`${later.map((d) => `Day ${d}`).join(" and ")} samples are taken after treatment started, so a difference there describes the two response groups as they already differ, and does not by itself show prediction or that the treatment caused the difference.`);
-  return parts.join(" ");
-}
 
 const STAT_COLUMNS = (alpha: number): ColumnDef<CohortStat>[] => [
   { key: "population", label: "Population", format: (v) => POPULATION_LABELS[v as Population] },
@@ -228,7 +208,6 @@ export function CohortPage() {
   const empty = !loading && summary !== null && summary.n_samples === 0;
   // The cohort fetch failed and left nothing to draw: say so instead of leaving skeletons up.
   const failed = !loading && error !== null && summary === null;
-  const description = cohortDescription(filters);
 
   // Defined once: the samples list is also worth showing when the rest of the cohort fetch failed but a
   // newer samples request had already delivered rows for these filters.
@@ -343,13 +322,11 @@ export function CohortPage() {
                     );
                   })}
                 </div>
-                <p className="note" style={{ marginTop: 12 }}>
-                  {description}. Cell frequency is the population count divided by the sum of the five population counts, as a percentage.{" "}
-                  {summary && (summary.n_missing_response > 0
-                    ? `${summary.n_missing_response.toLocaleString()} of ${summary.n_samples.toLocaleString()} matching samples are excluded from the comparison because no response is recorded for their subject.`
-                    : "No matching sample is excluded: every subject in this cohort has a recorded response.")}
-                </p>
-                <p className="note" style={{ marginTop: 8 }}>{interpretationNote(days)}</p>
+                {summary && summary.n_missing_response > 0 && (
+                  <p className="note">
+                    {summary.n_missing_response.toLocaleString()} of {summary.n_samples.toLocaleString()} matching samples are excluded from the comparison because no response is recorded for their subject.
+                  </p>
+                )}
               </>
             )}
           </Card>

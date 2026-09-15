@@ -83,6 +83,8 @@ export interface CohortPoint {
   time_from_treatment_start: number;
   response: "yes" | "no";
   percentage: number;
+  count: number;
+  total_count: number;
 }
 export interface CohortPointsResponse { points: CohortPoint[] }
 

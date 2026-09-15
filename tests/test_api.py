@@ -148,7 +148,8 @@ def test_cohort_points_default(client):
     body = client.get("/api/cohort/points").json()
     assert len(body["points"]) == 1968 * 5
     p = body["points"][0]
-    assert set(p) == {"sample", "subject", "population", "time_from_treatment_start", "response", "percentage"}
+    assert set(p) == {"sample", "subject", "population", "time_from_treatment_start", "response", "percentage", "count", "total_count"}
+    assert p["count"] > 0 and p["total_count"] >= p["count"]
     assert {x["response"] for x in body["points"]} == {"yes", "no"}
 
 

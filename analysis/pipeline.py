@@ -41,7 +41,7 @@ STRATA_COLUMNS = [
     "condition", "treatment", "sample_type", "project", "timepoints",
     "n_samples", "n_subjects", "n_missing_response", "n_tests",
 ]
-POINT_COLUMNS = ["sample", "subject", "population", "time_from_treatment_start", "response", "percentage"]
+POINT_COLUMNS = ["sample", "subject", "population", "time_from_treatment_start", "response", "percentage", "count", "total_count"]
 
 
 @dataclass(frozen=True)

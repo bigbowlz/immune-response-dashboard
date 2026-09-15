@@ -110,7 +110,8 @@ def response_points(conn: sqlite3.Connection, filters: Mapping[str, object]) -> 
     return conn.execute(
         "SELECT sample_summary.sample AS sample, samples.subject AS subject, "
         "sample_summary.population AS population, samples.time_from_treatment_start AS time_from_treatment_start, "
-        "subjects.response AS response, sample_summary.percentage AS percentage "
+        "subjects.response AS response, sample_summary.percentage AS percentage, "
+        "sample_summary.count AS count, sample_summary.total_count AS total_count "
         "FROM sample_summary "
         "JOIN samples ON samples.sample = sample_summary.sample "
         "JOIN subjects ON subjects.subject = samples.subject"

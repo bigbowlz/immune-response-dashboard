@@ -55,24 +55,65 @@ export function PopulationBoxplot({ population, points, stats, timepoints, alpha
   const testable = new Set(days.filter((d) => own.get(d)?.status === "ok"));
   const hit = days.some((d) => own.get(d)?.significant === 1);
 
-  const traces: Data[] = (["no", "yes"] as const).map((response) => {
+  // Boxes and points are separate traces on a numeric axis: the box is hover-only for its statistics
+  // (max, upper fence, q3, median, q1, lower fence, min, each label pointing at its line), the points carry
+  // the sample details. Inside the box body the box wins the hover; elsewhere the nearest point does.
+  const OFFSET = { no: -0.2, yes: 0.2 } as const;
+  const jitter = (sample: string) => {
+    let h = 0;
+    for (const ch of sample) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return ((h % 1000) / 1000 - 0.5) * 0.2;
+  };
+  const traces: Data[] = (["no", "yes"] as const).flatMap((response) => {
     const mine = points.filter((p) => p.response === response && testable.has(p.time_from_treatment_start));
-    return {
+    const name = response === "yes" ? "Responder" : "Non-responder";
+    const box = {
       type: "box",
-      name: response === "yes" ? "Responder" : "Non-responder",
-      x: mine.map((p) => dayLabel(p.time_from_treatment_start)),
+      name,
+      x: mine.map((p) => days.indexOf(p.time_from_treatment_start) + OFFSET[response]),
       y: mine.map((p) => p.percentage),
-      text: mine.map((p) => `${p.sample} (${p.subject})`),
-      hovertemplate: "%{text}<br>%{y:.2f}%<extra></extra>",
-      boxpoints: outliersOnly ? "outliers" : "all",
-      jitter: 0.6,
-      pointpos: 0,
-      marker: { color: LINE[response], size: 3.5, opacity: 0.6, symbol: SYMBOL[response] },
+      width: 0.3,
+      // Outliers stay enabled so the hover reports the fences as well as min/max; the markers themselves are
+      // invisible whenever the scatter layer draws every point.
+      boxpoints: "outliers",
+      hoveron: "boxes",
+      hoverinfo: "y",
+      marker: { color: LINE[response], size: 3.5, opacity: outliersOnly ? 0.6 : 0, symbol: SYMBOL[response] },
       line: { color: LINE[response], width: 1.2 },
       fillcolor: FILL[response] + "99",
-      offsetgroup: response,
       legendgroup: response,
     } as Data;
+    if (outliersOnly) return [box];
+    // Points inside a box body do not answer hover, so the box can report its statistics there; points
+    // outside it (whiskers and beyond) carry the sample details. The split uses the same linear
+    // quartiles Plotly draws, purely to decide which points stay hoverable.
+    const inBody = new Set<CohortPoint>();
+    for (const day of days) {
+      const values = mine.filter((p) => p.time_from_treatment_start === day).map((p) => p.percentage).sort((a, b) => a - b);
+      if (values.length === 0) continue;
+      const q = (f: number) => { const i = (values.length - 1) * f; const lo = Math.floor(i); return values[lo] + (values[Math.min(lo + 1, values.length - 1)] - values[lo]) * (i - lo); };
+      const [q1, q3] = [q(0.25), q(0.75)];
+      for (const p of mine) if (p.time_from_treatment_start === day && p.percentage >= q1 && p.percentage <= q3) inBody.add(p);
+    }
+    const dots = (subset: CohortPoint[], hoverable: boolean) => ({
+      type: "scatter",
+      mode: "markers",
+      name,
+      x: subset.map((p) => days.indexOf(p.time_from_treatment_start) + OFFSET[response] + jitter(p.sample)),
+      y: subset.map((p) => p.percentage),
+      text: subset.map((p) => [
+        `Count: ${p.count.toLocaleString()} / ${p.total_count.toLocaleString()}`,
+        `Population: ${POPULATION_LABELS[population]}`,
+        `Sample: ${p.sample}`,
+        `Subject: ${p.subject}`,
+        `Response: ${name}`,
+      ].join("<br>")),
+      hoverinfo: hoverable ? "y+text" : "skip",
+      marker: { color: LINE[response], size: 3.5, opacity: 0.6, symbol: SYMBOL[response] },
+      legendgroup: response,
+      showlegend: false,
+    }) as Data;
+    return [box, dots(mine.filter((p) => inBody.has(p)), false), dots(mine.filter((p) => !inBody.has(p)), true)];
   });
 
   // Adjusted p-values (or `unavailable`) as annotations under each day label, so size and colour are ours to set.
@@ -97,14 +138,17 @@ export function PopulationBoxplot({ population, points, stats, timepoints, alpha
 
   const layout: Partial<Layout> = {
     title: { text: POPULATION_LABELS[population], font: { size: 14, color: TEXT }, x: 0.02, xanchor: "left" },
-    boxmode: "group",
+    hovermode: "closest",
+    // Plotly ranks a box just under the hover limit so any nearby point beats it; a small limit means a point
+    // wins only when the cursor is on its marker and the box reports its statistics everywhere else in its span.
+    hoverdistance: 6,
     margin: { l: 52, r: 12, t: 36, b: 110 },
     height: 380,
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "#ffffff",
     font: { family: "Inter, system-ui, sans-serif", size: 12, color: TEXT },
-    xaxis: { type: "category", categoryorder: "array", categoryarray: categories, showgrid: false, tickfont: { size: 12 } },
-    yaxis: { title: { text: "Cell frequency (%)" }, gridcolor: "#eef0f3", zeroline: false, rangemode: "tozero", range: sharedYMax ? [0, sharedYMax] : undefined },
+    xaxis: { tickvals: days.map((_, i) => i), ticktext: categories, range: [-0.5, days.length - 0.5], showgrid: false, zeroline: false, fixedrange: true, tickfont: { size: 12, color: TEXT } },
+    yaxis: { title: { text: "Cell frequency (%)", font: { size: 12, color: TEXT }, standoff: 8 }, tickfont: { size: 12, color: TEXT }, hoverformat: ".2f", gridcolor: "#eef0f3", zeroline: false, rangemode: "tozero", range: sharedYMax ? [0, sharedYMax] : undefined },
     legend: { orientation: "h", y: -0.4, x: 0.5, xanchor: "center" },
     annotations,
     showlegend: true,
