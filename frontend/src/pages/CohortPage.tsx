@@ -77,7 +77,7 @@ const STAT_COLUMNS = (alpha: number): ColumnDef<CohortStat>[] => [
   { key: "effect_size", label: "Cliff's delta", numeric: true, help: "Positive when responders have the higher frequency.", format: (v) => (v === null ? "—" : formatDelta(Number(v))) },
   {
     key: "status",
-    label: "Status",
+    label: "Significance",
     render: (_v, row) =>
       row.status === "unavailable"
         ? <Chip tone="neutral">Unavailable</Chip>
