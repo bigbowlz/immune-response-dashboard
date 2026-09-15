@@ -14,6 +14,7 @@ interface Props {
 /** A listbox-style dropdown whose menu opens below the control, so the current value stays readable. */
 export function Select({ id, label, value, options, disabled, onChange }: Props) {
   const [open, setOpen] = useState(false);
+  const [closing, setClosing] = useState(false); // keeps the menu mounted while it animates shut
   const [active, setActive] = useState(0);
   const root = useRef<HTMLDivElement>(null);
   const menuId = useId();
@@ -21,7 +22,7 @@ export function Select({ id, label, value, options, disabled, onChange }: Props)
 
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => { if (!root.current?.contains(e.target as Node)) setOpen(false); };
+    const close = (e: MouseEvent) => { if (!root.current?.contains(e.target as Node)) hide(); };
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
@@ -33,12 +34,17 @@ export function Select({ id, label, value, options, disabled, onChange }: Props)
 
   const show = () => {
     setActive(Math.max(0, options.findIndex((o) => o.value === value)));
+    setClosing(false);
     setOpen(true);
+  };
+  const hide = () => {
+    setOpen(false);
+    setClosing(true);
   };
   const choose = (index: number) => {
     const option = options[index];
     if (option) onChange(option.value);
-    setOpen(false);
+    hide();
     root.current?.querySelector("button")?.focus();
   };
 
@@ -60,8 +66,8 @@ export function Select({ id, label, value, options, disabled, onChange }: Props)
         e.preventDefault();
         if (open) choose(active); else show();
         break;
-      case "Escape": if (open) { e.preventDefault(); setOpen(false); } break;
-      case "Tab": setOpen(false); break;
+      case "Escape": if (open) { e.preventDefault(); hide(); } break;
+      case "Tab": if (open) hide(); break;
     }
   };
 
@@ -76,14 +82,21 @@ export function Select({ id, label, value, options, disabled, onChange }: Props)
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         disabled={disabled}
-        onClick={() => (open ? setOpen(false) : show())}
+        onClick={() => (open ? hide() : show())}
         onKeyDown={onKeyDown}
       >
         <span className="select__value">{current?.label ?? ""}</span>
         <span className="select__chevron" aria-hidden="true" />
       </button>
-      {open && (
-        <ul className="select__menu" role="listbox" id={menuId} aria-label={label}>
+      {(open || closing) && (
+        <ul
+          className={`select__menu${open ? "" : " select__menu--closing"}`}
+          role="listbox"
+          id={menuId}
+          aria-label={label}
+          aria-hidden={!open}
+          onAnimationEnd={() => { if (!open) setClosing(false); }}
+        >
           {options.map((o, index) => (
             <li
               key={o.value}
