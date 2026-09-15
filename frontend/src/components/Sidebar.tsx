@@ -20,9 +20,10 @@ export function Sidebar({ active, generatedAt }: { active: PageKey; generatedAt?
           {item.label}
         </a>
       ))}
-      {generatedAt && (
-        <div className="sidebar__footer">Pipeline run {new Date(generatedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</div>
-      )}
+      <div className="sidebar__footer">
+        {generatedAt && <div>Pipeline run {new Date(generatedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</div>}
+        <div className="sidebar__signature">Built by Wanli Zhou</div>
+      </div>
     </nav>
   );
 }

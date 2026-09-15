@@ -12,7 +12,7 @@ const COLUMNS: ColumnDef<SummaryRow>[] = [
   { key: "total_count", label: "total_count", numeric: true, format: (v) => Number(v).toLocaleString() },
   { key: "population", label: "population" },
   { key: "count", label: "count", numeric: true, format: (v) => Number(v).toLocaleString() },
-  { key: "percentage", label: "percentage", numeric: true, format: (v) => Number(v).toFixed(2) },
+  { key: "percentage", label: "percentage (%)", numeric: true, format: (v) => Number(v).toFixed(2) },
 ];
 
 export function FrequenciesPage() {
@@ -46,7 +46,7 @@ export function FrequenciesPage() {
   return (
     <>
       <PageHeader title="Cell frequencies" subtitle="Relative frequency of each immune cell population in every sample, as a percentage of the sample's total cell count." />
-      <Card title="Population summary" subtitle="One row per population per sample. percentage = count / total_count x 100. Sorting, search and export cover all rows, not just the page shown.">
+      <Card title="Population summary" subtitle="One row per population per sample.">
         {error && <p className="error">{error}</p>}
         <div className="frequencies">
         <DataTable
@@ -66,6 +66,7 @@ export function FrequenciesPage() {
             <>
               <input type="search" placeholder="Search sample or population" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} aria-label="Search sample or population" />
               <a className="button" href={csvHref} download>Export CSV</a>
+              <button type="button" className="help" aria-label="Export covers all rows, not just the page shown." data-tip="Export covers all rows, not just the page shown.">?</button>
             </>
           }
         />
