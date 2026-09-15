@@ -63,16 +63,100 @@ Tests: `.venv/bin/python -m pytest`. Interactive API docs: `http://localhost:800
 | API (`server/`)        | Reads the pipeline's result tables, and for the selected cohort's filters runs COUNT/GROUP BY queries over the raw sample and subject tables to count, break down and list the matching samples; never imports pandas or scipy, never computes a statistic |
 | Frontend (`frontend/`) | Fetches from the API and renders the two pages with React and Plotly                                                                                                                                                                                                            |
 
-**Schema** — three raw tables plus five result tables in `cell_counts.db`:
+**Schema** — three raw tables and five result tables in `cell_counts.db`, declared in `analysis/schema.py`. `load_data.py` creates all eight and fills the raw ones from the CSV; the pipeline fills the result tables. The CSV repeats each subject's metadata on every row, so the loader normalises it into `subjects`, rejecting a subject whose metadata differs between rows, and keeps the per-sample fields in `samples`.
 
-- `subjects` — one row per subject: project, condition, age, sex, treatment, response
-- `samples` — one row per sample: subject, sample type, day (`time_from_treatment_start`)
-- `cell_counts` — one row per sample per population: raw count
-- `sample_summary` — one row per sample per population: count as a percentage of that sample's total
-- `response_stats` — one row per cohort key (condition, treatment, sample type, project) per correction family (`timepoints`: `all`, `0`, `7` or `14`) per population per day: Mann-Whitney U, raw and BH-adjusted p, Cliff's delta, significance. A cell that could not be tested carries NULL statistics with `status = 'unavailable'` and a `reason`
-- `response_strata` — one row per cohort key per correction family: `n_samples`, `n_subjects`, `n_missing_response`, `n_tests` (the valid tests the correction ran across)
-- `cohort_summary` — the default cohort's baseline sample and subject counts by project, response and sex; a static answer kept for direct SQL inspection, while the cohort endpoints recompute counts for user-chosen filters
-- `pipeline_meta` — provenance of the last pipeline run: `generated_at`, `csv_sha256`, `csv_rows`, `python_version`, `pandas_version`, `scipy_version`
+`subjects` — one row per subject
+
+| Column      | Type    | Key | Meaning                                                     |
+| ----------- | ------- | --- | ----------------------------------------------------------- |
+| `subject`   | TEXT    | PK  | subject id                                                  |
+| `project`   | TEXT    |     | prj1, prj2 or prj3                                          |
+| `condition` | TEXT    |     | melanoma, carcinoma or healthy                              |
+| `age`       | INTEGER |     | age in years                                                |
+| `sex`       | TEXT    |     | M or F (checked)                                            |
+| `treatment` | TEXT    |     | miraclib, phauximab or none                                 |
+| `response`  | TEXT    |     | yes or no (checked); NULL when no response was recorded     |
+
+`samples` — one row per sample, indexed on `subject`
+
+| Column                      | Type    | Key                     | Meaning                    |
+| --------------------------- | ------- | ----------------------- | -------------------------- |
+| `sample`                    | TEXT    | PK                      | sample id                  |
+| `subject`                   | TEXT    | FK → `subjects.subject` | subject the sample is from |
+| `sample_type`               | TEXT    |                         | PBMC or WB                 |
+| `time_from_treatment_start` | INTEGER |                         | day 0, 7 or 14             |
+
+`cell_counts` — one row per sample per population
+
+| Column       | Type    | Key                       | Meaning                                              |
+| ------------ | ------- | ------------------------- | ---------------------------------------------------- |
+| `sample`     | TEXT    | PK, FK → `samples.sample` |                                                      |
+| `population` | TEXT    | PK                        | b_cell, cd8_t_cell, cd4_t_cell, nk_cell or monocyte  |
+| `count`      | INTEGER |                           | raw cell count, checked ≥ 0                          |
+
+`sample_summary` — one row per sample per population (the Part 2 table)
+
+| Column        | Type    | Key                       | Meaning                                           |
+| ------------- | ------- | ------------------------- | ------------------------------------------------- |
+| `sample`      | TEXT    | PK, FK → `samples.sample` |                                                   |
+| `total_count` | INTEGER |                           | sum of the five populations' counts in the sample |
+| `population`  | TEXT    | PK                        |                                                   |
+| `count`       | INTEGER |                           | raw cell count                                    |
+| `percentage`  | REAL    |                           | `count` as a percentage of `total_count`          |
+
+`response_stats` — one row per cohort key per correction family per population per day. The first seven columns form the primary key; the first four are each `all` or one value, and `timepoints` names the correction family: `all` (Benjamini-Hochberg across the three days' tests together) or `0`, `7` or `14` (across that day's tests only).
+
+| Column                      | Type    | Key | Meaning                                                                                                  |
+| --------------------------- | ------- | --- | -------------------------------------------------------------------------------------------------------- |
+| `condition`                 | TEXT    | PK  | `all` or a condition                                                                                     |
+| `treatment`                 | TEXT    | PK  | `all` or a treatment                                                                                     |
+| `sample_type`               | TEXT    | PK  | `all` or a sample type                                                                                   |
+| `project`                   | TEXT    | PK  | `all` or a project                                                                                       |
+| `timepoints`                | TEXT    | PK  | correction family: `all`, `0`, `7` or `14`                                                               |
+| `population`                | TEXT    | PK  |                                                                                                          |
+| `time_from_treatment_start` | INTEGER | PK  | the day this test compares                                                                               |
+| `n_responders`              | INTEGER |     | samples with response yes in the test                                                                    |
+| `n_nonresponders`           | INTEGER |     | samples with response no in the test                                                                     |
+| `median_responders`         | REAL    |     | median percentage among responders                                                                       |
+| `median_nonresponders`      | REAL    |     | median percentage among non-responders                                                                   |
+| `u_statistic`               | REAL    |     | Mann-Whitney U, responders against non-responders                                                        |
+| `p_raw`                     | REAL    |     | two-sided p-value                                                                                        |
+| `p_adj`                     | REAL    |     | Benjamini-Hochberg adjusted p within the family                                                          |
+| `effect_size`               | REAL    |     | Cliff's delta, positive when responders are higher                                                       |
+| `significant`               | INTEGER |     | 1 when `p_adj` < 0.05, else 0 (checked)                                                                  |
+| `status`                    | TEXT    |     | `ok` or `unavailable` (checked); the six statistics above are NULL when unavailable                      |
+| `reason`                    | TEXT    |     | why the cell could not be tested, NULL when `ok`                                                         |
+
+`response_strata` — one row per cohort key per correction family
+
+| Column               | Type    | Key | Meaning                                              |
+| -------------------- | ------- | --- | ---------------------------------------------------- |
+| `condition`          | TEXT    | PK  | `all` or a condition                                 |
+| `treatment`          | TEXT    | PK  | `all` or a treatment                                 |
+| `sample_type`        | TEXT    | PK  | `all` or a sample type                               |
+| `project`            | TEXT    | PK  | `all` or a project                                   |
+| `timepoints`         | TEXT    | PK  | correction family: `all`, `0`, `7` or `14`           |
+| `n_samples`          | INTEGER |     | matching samples                                     |
+| `n_subjects`         | INTEGER |     | distinct subjects among them                         |
+| `n_missing_response` | INTEGER |     | matching samples with no recorded response           |
+| `n_tests`            | INTEGER |     | valid tests the correction ran across in this family |
+
+`cohort_summary` — the default cohort at baseline, broken down for direct SQL inspection (the API recomputes these counts for any filters)
+
+| Column        | Type    | Key | Meaning                                            |
+| ------------- | ------- | --- | -------------------------------------------------- |
+| `breakdown`   | TEXT    | PK  | `project`, `response`, `sex` or `total`            |
+| `category`    | TEXT    | PK  | the value within that breakdown                    |
+| `n_samples`   | INTEGER |     | samples in the category                            |
+| `n_subjects`  | INTEGER |     | distinct subjects in the category                  |
+| `pct_samples` | REAL    |     | `n_samples` as a percentage of the cohort's samples |
+
+`pipeline_meta` — provenance of the last pipeline run
+
+| Column  | Type | Key | Meaning                                                                                         |
+| ------- | ---- | --- | ----------------------------------------------------------------------------------------------- |
+| `key`   | TEXT | PK  | `generated_at`, `csv_sha256`, `csv_rows`, `python_version`, `pandas_version` or `scipy_version` |
+| `value` | TEXT |     |                                                                                                 |
 
 **API** (all `GET`, under `/api`):
 
