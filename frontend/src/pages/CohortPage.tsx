@@ -294,9 +294,6 @@ export function CohortPage() {
                   <BreakdownCard title="Project" rows={summary.breakdowns.project} />
                   <BreakdownCard title="Response" rows={summary.breakdowns.response} />
                   <BreakdownCard title="Sex" rows={summary.breakdowns.sex} />
-                  {filters.time_from_treatment_start === "all" && (
-                    <BreakdownCard title="Timepoint" rows={summary.breakdowns.time_from_treatment_start} timepoint />
-                  )}
                 </div>
               </>
             )}
