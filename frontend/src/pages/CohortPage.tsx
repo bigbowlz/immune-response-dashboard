@@ -208,6 +208,8 @@ export function CohortPage() {
     setFilters(next);
     if ((Object.keys(DEFAULT_FILTERS) as Array<keyof CohortFilters>).some((k) => next[k] !== filters[k])) setDefaultOn(false);
   };
+  // The switch and the reset button both select the default cohort, so both leave the switch on.
+  const resetToDefault = () => { applyFilters(DEFAULT_FILTERS); setDefaultOn(true); };
 
   const rows = stats?.rows ?? [];
   const days = useMemo(() => [...new Set(rows.map((r) => r.time_from_treatment_start))].sort((a, b) => a - b), [rows]);
@@ -262,7 +264,7 @@ export function CohortPage() {
         onChange={applyFilters}
         defaultOn={defaultOn}
         onBaseline={(on) => applyFilters({ ...filters, time_from_treatment_start: on ? "0" : "all" })}
-        onDefault={(on) => { if (on) { applyFilters(DEFAULT_FILTERS); setDefaultOn(true); } else setDefaultOn(false); }}
+        onDefault={(on) => { if (on) resetToDefault(); else setDefaultOn(false); }}
       />
 
       {failed ? (
@@ -277,7 +279,7 @@ export function CohortPage() {
         <Card title="Key metadata distribution">
           <div className="empty" aria-live="polite">
             <span>No samples match these filters.</span>
-            <button type="button" className="button" onClick={() => applyFilters(DEFAULT_FILTERS)}>Reset to default cohort</button>
+            <button type="button" className="button" onClick={resetToDefault}>Reset to default cohort</button>
           </div>
         </Card>
       ) : (
