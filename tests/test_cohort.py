@@ -42,6 +42,11 @@ def test_breakdown_reports_null_response_as_unknown(loaded_conn):
     assert rows[0]["n_samples"] == 1422
 
 
+def test_breakdown_orders_null_category_last(loaded_conn):
+    rows = cohort.breakdown(loaded_conn, {}, "response")
+    assert [r["category"] for r in rows] == ["no", "yes", "unknown"]
+
+
 def test_cohort_options(loaded_conn):
     options = cohort.cohort_options(loaded_conn)
     assert list(options.keys()) == list(cohort.FILTER_COLUMNS.keys())

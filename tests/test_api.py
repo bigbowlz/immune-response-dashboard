@@ -123,6 +123,13 @@ def test_cohort_stats_single_timepoint(client):
     assert all(r["time_from_treatment_start"] == 14 for r in body["rows"])
 
 
+def test_cohort_stats_zero_padded_timepoint_maps_to_same_family(client):
+    body = client.get("/api/cohort/stats", params={"time_from_treatment_start": "07"}).json()
+    assert body["family"] == "7"
+    assert len(body["rows"]) == 5
+    assert all(r["time_from_treatment_start"] == 7 for r in body["rows"])
+
+
 def test_cohort_stats_healthy_none_all_unavailable(client):
     body = client.get("/api/cohort/stats", params={"condition": "healthy", "treatment": "none"}).json()
     assert len(body["rows"]) == 15 and body["n_tests"] == 0
@@ -141,7 +148,7 @@ def test_cohort_points_default(client):
     body = client.get("/api/cohort/points").json()
     assert len(body["points"]) == 1968 * 5
     p = body["points"][0]
-    assert set(p) == {"sample", "subject", "project", "population", "time_from_treatment_start", "response", "percentage"}
+    assert set(p) == {"sample", "subject", "population", "time_from_treatment_start", "response", "percentage"}
     assert {x["response"] for x in body["points"]} == {"yes", "no"}
 
 

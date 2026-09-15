@@ -79,7 +79,6 @@ export interface CohortStatsResponse {
 export interface CohortPoint {
   sample: string;
   subject: string;
-  project: string;
   population: Population;
   time_from_treatment_start: number;
   response: "yes" | "no";

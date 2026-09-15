@@ -142,7 +142,11 @@ export function CohortPage() {
     request.then(
       (r) => {
         if (id !== samplesRequest.current) return;
-        setSamples(r.rows); setSamplesTotal(r.total); setSamplesLoading(false); setError(null);
+        setSamples(r.rows); setSamplesTotal(r.total); setSamplesLoading(false);
+        // A fetch that rides along with a filter change must not clear the page-level error: the
+        // filter effect below owns that state, and a samples success that resolves after a filter
+        // failure has already reported it must not wipe the error back to null.
+        if (!shared) setError(null);
       },
       () => {
         if (id === samplesRequest.current && !controller.signal.aborted) setSamplesLoading(false);
@@ -212,6 +216,10 @@ export function CohortPage() {
     return map;
   }, [points]);
   const alpha = stats?.alpha ?? 0.05;
+  // Plotly renders every individual point by default; past a few thousand that gets slow and cluttered,
+  // so wide cohorts fall back to outliers only. Based on samples with a recorded response (what the
+  // boxplots actually draw), not the raw sample count.
+  const wideCohort = stats !== null && stats.n_samples - stats.n_missing_response > 3000;
   const nUnavailable = rows.filter((r) => r.status === "unavailable").length;
   const empty = !loading && summary !== null && summary.n_samples === 0;
   // The cohort fetch failed and left nothing to draw: say so instead of leaving skeletons up.
@@ -222,7 +230,8 @@ export function CohortPage() {
   // newer samples request had already delivered rows for these filters.
   const samplesCard = (
     <Card title="Matching samples" subtitle="Every sample in the selected cohort. Sorting, paging and the export cover all matching rows, not just the page shown.">
-      {error && <p className="error">{error}</p>}
+      {/* The failed card above already shows the page-level error once; do not repeat it here. */}
+      {!failed && error && <p className="error">{error}</p>}
       <DataTable
         columns={SAMPLE_COLUMNS}
         rows={samples}
@@ -304,6 +313,11 @@ export function CohortPage() {
             ) : (
               <>
                 <p className="result">{headline(rows, alpha)}</p>
+                {wideCohort && (
+                  <p className="note">
+                    Individual points are hidden for cohorts with more than 3,000 samples; boxes and whiskers show the distribution.
+                  </p>
+                )}
                 <div className="charts">
                   {POPULATIONS.map((population) => {
                     const own = rows.filter((r) => r.population === population);
@@ -324,12 +338,13 @@ export function CohortPage() {
                         stats={rows}
                         timepoints={days}
                         alpha={alpha}
+                        outliersOnly={wideCohort}
                       />
                     );
                   })}
                 </div>
                 <p className="note" style={{ marginTop: 12 }}>
-                  {description}. The y axis is percent of total (five populations).{" "}
+                  {description}. Percent of total means count divided by the sum of the five population counts.{" "}
                   {summary && (summary.n_missing_response > 0
                     ? `${summary.n_missing_response.toLocaleString()} of ${summary.n_samples.toLocaleString()} matching samples are excluded from the comparison because no response is recorded for their subject.`
                     : "No matching sample is excluded: every subject in this cohort has a recorded response.")}

@@ -41,9 +41,12 @@ interface Props {
   timepoints: number[];
   alpha: number;
   sharedYMax?: number;
+  /** When true (cohorts with more than 3,000 samples carrying a response), plot only the outliers
+   * instead of every individual point, so the chart stays legible and light to render. */
+  outliersOnly?: boolean;
 }
 
-export function PopulationBoxplot({ population, points, stats, timepoints, alpha, sharedYMax }: Props) {
+export function PopulationBoxplot({ population, points, stats, timepoints, alpha, sharedYMax, outliersOnly }: Props) {
   const { FILL, LINE, TEXT, MUTED, ACCENT } = readPalette();
   const days = [...timepoints].sort((a, b) => a - b);
   const categories = days.map(dayLabel);
@@ -61,7 +64,7 @@ export function PopulationBoxplot({ population, points, stats, timepoints, alpha
       y: mine.map((p) => p.percentage),
       text: mine.map((p) => `${p.sample} (${p.subject})`),
       hovertemplate: "%{text}<br>%{y:.2f}%<extra></extra>",
-      boxpoints: "all",
+      boxpoints: outliersOnly ? "outliers" : "all",
       jitter: 0.6,
       pointpos: 0,
       marker: { color: LINE[response], size: 3.5, opacity: 0.6, symbol: SYMBOL[response] },
@@ -101,7 +104,7 @@ export function PopulationBoxplot({ population, points, stats, timepoints, alpha
     plot_bgcolor: "#ffffff",
     font: { family: "Inter, system-ui, sans-serif", size: 12, color: TEXT },
     xaxis: { type: "category", categoryorder: "array", categoryarray: categories, showgrid: false, tickfont: { size: 12 } },
-    yaxis: { title: { text: "Percent of total (five populations)" }, gridcolor: "#eef0f3", zeroline: false, rangemode: "tozero", range: sharedYMax ? [0, sharedYMax] : undefined },
+    yaxis: { title: { text: "Percent of total" }, gridcolor: "#eef0f3", zeroline: false, rangemode: "tozero", range: sharedYMax ? [0, sharedYMax] : undefined },
     legend: { orientation: "h", y: -0.4, x: 0.5, xanchor: "center" },
     annotations,
     showlegend: true,

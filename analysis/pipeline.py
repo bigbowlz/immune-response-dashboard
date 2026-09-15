@@ -27,7 +27,6 @@ except ModuleNotFoundError:  # pragma: no cover - exercised only when make setup
 from analysis import cohort, schema, stats
 
 COHORT_DIMENSIONS = ("condition", "treatment", "sample_type", "project")
-FAMILIES = ("all", "0", "7", "14")
 DAYS = (0, 7, 14)
 
 NO_RESPONSES_REASON = "no recorded responses in this cohort"
@@ -42,7 +41,7 @@ STRATA_COLUMNS = [
     "condition", "treatment", "sample_type", "project", "timepoints",
     "n_samples", "n_subjects", "n_missing_response", "n_tests",
 ]
-POINT_COLUMNS = ["sample", "subject", "project", "population", "time_from_treatment_start", "response", "percentage"]
+POINT_COLUMNS = ["sample", "subject", "population", "time_from_treatment_start", "response", "percentage"]
 
 
 @dataclass(frozen=True)
@@ -141,6 +140,9 @@ def write_response_stats(conn: sqlite3.Connection) -> tuple[pd.DataFrame, pd.Dat
         cohort_count = cohort.count_cohort(conn, filters)
         missing_all = cohort.missing_response_count(conn, filters)
         if cohort_count["n_samples"] > 0 and missing_all == cohort_count["n_samples"]:
+            # Safe to apply to every timepoint slice of `cells`, not just the 'all' family: response is
+            # subject-level, not sample-level, and every subject has a sample at every timepoint, so a
+            # cohort with no recorded responses overall has none at any single timepoint either.
             cells = cells.copy()
             cells["reason"] = NO_RESPONSES_REASON
 

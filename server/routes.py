@@ -156,7 +156,11 @@ def cohort_filters(
         if parsed not in allowed:
             raise HTTPException(status_code=422, detail=f"{name} must be 'all' or one of {allowed}")
         filters[name] = parsed
-    return CohortFilters(filters=filters, key=raw, family=raw["time_from_treatment_start"])
+    # Derived from the parsed value, not the raw query string: "07" and "7" both parse to the int 7,
+    # so both must land in the same response_stats/response_strata family, "7".
+    timepoint = filters["time_from_treatment_start"]
+    family = "all" if timepoint is None else str(timepoint)
+    return CohortFilters(filters=filters, key=raw, family=family)
 
 
 Filters = Annotated[CohortFilters, Depends(cohort_filters)]

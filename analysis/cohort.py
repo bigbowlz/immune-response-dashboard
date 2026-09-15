@@ -73,7 +73,7 @@ def breakdown(conn: sqlite3.Connection, filters: Mapping[str, object], by: str) 
     total = count_cohort(conn, filters)["n_samples"]
     rows = conn.execute(
         f"SELECT {column} AS category, COUNT(*) AS n_samples, COUNT(DISTINCT samples.subject) AS n_subjects "
-        f"{_FROM_SAMPLES}{where} GROUP BY {column} ORDER BY {column}",
+        f"{_FROM_SAMPLES}{where} GROUP BY {column} ORDER BY ({column} IS NULL), {column}",
         params,
     ).fetchall()
     return [
@@ -108,7 +108,7 @@ def response_points(conn: sqlite3.Connection, filters: Mapping[str, object]) -> 
     response_clause = "subjects.response IN ('yes', 'no')"
     where_sql = f"{where} AND {response_clause}" if where else f" WHERE {response_clause}"
     return conn.execute(
-        "SELECT sample_summary.sample AS sample, samples.subject AS subject, subjects.project AS project, "
+        "SELECT sample_summary.sample AS sample, samples.subject AS subject, "
         "sample_summary.population AS population, samples.time_from_treatment_start AS time_from_treatment_start, "
         "subjects.response AS response, sample_summary.percentage AS percentage "
         "FROM sample_summary "
