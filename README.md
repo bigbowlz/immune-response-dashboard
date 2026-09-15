@@ -8,7 +8,7 @@ Live dashboard: https://immune-response-dashboard.vercel.app (the same app that 
 
 ## What it shows
 
-- **Cohort analysis** — pick a cohort with five filters, then read its composition, per-population boxplots of cell frequency by day split by response, the statistics behind each panel, and the list of matching samples.
+- **Cohort analysis** — pick a cohort with five filters, then read its composition, a one-line finding, per-population boxplots of cell frequency by day split by response, the statistics behind each panel, and the list of matching samples.
 - **Cell frequencies** — a searchable, sortable, exportable table of every sample's relative cell-population frequencies.
 
 In the default cohort — melanoma patients treated with miraclib, PBMC samples, all projects, all timepoints, 1,968 samples from 656 subjects — no population separates responders from non-responders after multiple-comparison correction; the largest differences (B cells lower in responders at day 14, adjusted p 0.216, and CD4 T cells higher at day 7, 0.223) do not reach significance.
@@ -25,7 +25,9 @@ Five filters define the cohort, each taking `all` or one value from the data:
 | Project     | all, prj1, prj2, prj3             | all      |
 | Timepoints  | all, 0, 7, 14                     | all      |
 
-The "Baseline only" switch sets timepoints to day 0 and leaves the other four alone; the "Default cohort" switch restores all five defaults. A cohort is the selected group of samples and their subjects, never an individual subject or sample. Below the charts and the statistics table, "Matching samples" lists every sample in the cohort — sample, subject, project, condition, treatment, sample type, timepoint, response and sex — with sorting and paging.
+The "Baseline only" switch sets timepoints to day 0 and leaves the other four alone; the "Default cohort" switch restores all five defaults. A cohort is the selected group of samples and their subjects, never an individual subject or sample.
+
+Above the charts, one sentence names the population with the largest responder difference at the earliest selected day and says whether any test in the cohort is significant. Hovering a point on a boxplot shows that sample's count, population, sample and subject IDs and response; hovering a box shows its maximum, upper fence, quartiles, median, lower fence and minimum. The statistics table explains its U and Cliff's delta columns in header tooltips. Below it, "Matching samples" lists every sample in the cohort — sample, subject, project, condition, treatment, sample type, timepoint, response and sex — with sorting and paging.
 
 With every filter widened to "all" the cohort is the whole dataset: 10,500 samples from 3,500 subjects, 1,422 of them without a recorded response. Those are the samples of the 474 untreated healthy subjects; the page counts them and says how many there are instead of putting them in the comparison.
 
@@ -80,7 +82,7 @@ Tests: `.venv/bin/python -m pytest`. Interactive API docs: `http://localhost:800
 | `/api/frequencies?search=&sort=&dir=&limit=&offset=` | One page of the cell-frequency table (`limit` 1–500, default 50; `offset` default 0); sorted and searched in SQL so a page stays a few KB |
 | `/api/frequencies.csv?search=&sort=&dir=`            | The same table as a full CSV, every matching row, streamed                                                                                |
 | `/api/cohort/options`                                | The distinct filter values available                                                                                                      |
-| `/api/cohort/summary?…`                              | Sample and subject counts, how many matching samples have no recorded response, and breakdowns by project, response, sex and timepoint    |
+| `/api/cohort/summary?…`                              | Sample and subject counts, how many matching samples have no recorded response, and breakdowns by project, response, sex and timepoint (the page shows the first three) |
 | `/api/cohort/stats?…`                                | The cohort's `response_stats` rows including unavailable ones, the correction `family` they belong to, and `n_tests`                      |
 | `/api/cohort/points?…`                               | Per-sample percentages behind the boxplots, for the samples with a recorded response                                                      |
 | `/api/cohort/samples?…&sort=&dir=&limit=&offset=`    | One page of the matching samples (`limit` 1–500, default 50; `offset` default 0)                                                          |
@@ -103,7 +105,7 @@ The hosted copy serves a `cell_counts.db` committed to the repo; a local run reg
 
 **Effect size.** Cliff's delta (2U / (n1·n2) − 1), positive when responders are higher. A p-value is never reported without it, so a small but "significant" difference can't be read as a large one.
 
-**Baseline and post-treatment days.** Day 0 samples are taken before treatment, so a day-0 difference is an association with the response recorded later, not evidence that the population predicts it. Day 7 and day 14 samples are taken after treatment started, so a difference there describes how the two response groups already differ; by itself it shows neither prediction nor that the treatment caused the difference. The page says which of the two a reader is looking at, and "Baseline only" narrows the cohort to day 0 in one click.
+**Baseline and post-treatment days.** Day 0 samples are taken before treatment, so a day-0 difference is an association with the response recorded later, not evidence that the population predicts it. Day 7 and day 14 samples are taken after treatment started, so a difference there describes how the two response groups already differ; by itself it shows neither prediction nor that the treatment caused the difference. The charts, the finding line and the "Baseline only" tooltip label day 0 as baseline, and that switch narrows the cohort to day 0 in one click.
 
 `response_stats` for the default cohort (melanoma, miraclib, PBMC, all projects) with all timepoints selected, so the Benjamini-Hochberg correction runs across these 15 tests:
 
@@ -147,8 +149,8 @@ Each view is laid out for the question it answers. One cohort analysis page now 
 | Named study visits                             | Numeric days (0, 7, 14), with day 0 labelled baseline                                                                                | That's what the data carries, and it separates a pre-treatment association from a post-treatment difference                              |
 | A static cohort overview                       | Five filters sit above the metadata cards, the charts, the statistics and the sample list                                            | The task asks for a cohort a reader can widen or narrow, not a fixed summary                                                             |
 | —                                              | The overview table shows the Part 2 percentage-of-total summary                                                                      | The table's shape follows the assignment, not a separate convention                                                                      |
-| Repeated measures left implicit                | Both the dashboard text and this README say each subject contributes one sample per timepoint and that tests run per timepoint       | Makes the independence assumption a reader can check, since it's the main statistical trap in this data                                  |
-| No timepoint singled out                       | Day 0 differences are described as baseline associations, day 7 and 14 as post-treatment differences                                 | Naming what each day can and cannot support keeps the reading of the chart honest                                                        |
+| Repeated measures left implicit                | The U column's tooltip says each test runs per population per timepoint, and this README states the one-sample-per-subject fact behind it | Makes the independence assumption a reader can check, since it's the main statistical trap in this data                                  |
+| No timepoint singled out                       | Day 0 is labelled baseline in the charts and the finding line; this README reads day 0 differences as baseline associations and day 7 and 14 as post-treatment differences | Naming what each day can and cannot support keeps the reading of the chart honest                                                        |
 | A filter only redraws the chart                | Every filter re-selects a precomputed correction family, so the statistics and their BH correction always match the cohort on screen | Correcting per cohort is the only way a cohort's numbers stay internally consistent, and precomputing every key keeps it instant         |
 
 [![CI](https://github.com/bigbowlz/immune-response-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/bigbowlz/immune-response-dashboard/actions/workflows/ci.yml)
