@@ -16,8 +16,8 @@ export const FILTER_LABELS: Record<CohortFilterKey, string> = {
 /** The order of the selects; the crumb line follows the same order. */
 const FILTER_ORDER: CohortFilterKey[] = ["condition", "treatment", "sample_type", "time_from_treatment_start", "project"];
 
-const BASELINE_TIP = "Keeps only day 0 samples, taken before treatment. Switching it off restores all timepoints.";
-const DEFAULT_TIP = "Melanoma, miraclib, PBMC, all timepoints, all projects. Switching it on resets every selector; it switches off when any selector changes.";
+const BASELINE_TIP = "Keeps only day 0 samples, taken before treatment.";
+const DEFAULT_TIP = "Melanoma, miraclib, PBMC, all timepoints, all projects. Switching it on resets every selector.";
 
 const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
