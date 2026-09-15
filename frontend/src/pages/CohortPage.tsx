@@ -57,7 +57,8 @@ function headline(rows: CohortStat[], alpha: number): ReactNode {
       {hits.length === 0
         ? <>No test in this cohort has an adjusted p below {alpha}.</>
         : <>{hits.length === 1 ? "One test" : `${hits.length} tests`} in this cohort {hits.length === 1 ? "has" : "have"} an adjusted p below {alpha}:{" "}
-          {hits.map((r, i) => <span key={`${r.population}-${r.time_from_treatment_start}`}>{i > 0 && ", "}<strong>{populationLabel(r)}</strong> at <strong>{dayLabel(r.time_from_treatment_start).toLowerCase()}</strong></span>)}.</>}
+          {hits.map((r, i) => <span key={`${r.population}-${r.time_from_treatment_start}`}>{i > 0 && ", "}<strong>{populationLabel(r)}</strong> at <strong>{dayLabel(r.time_from_treatment_start).toLowerCase()}</strong></span>)}.</>}{" "}
+      Adjusted p-values are corrected for the <strong>{ok.length.toLocaleString()}</strong> {ok.length === 1 ? "test" : "tests"} run in this cohort, one per population at each selected day.
     </>
   );
 }
