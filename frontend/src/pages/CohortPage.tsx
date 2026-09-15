@@ -26,6 +26,17 @@ const DEFAULT_TABLE: TableState = { sort: "sample", dir: "asc", page: 0 };
 const populationLabel = (s: CohortStat) => POPULATION_LABELS[s.population];
 const direction = (delta: number) => (delta >= 0 ? "higher" : "lower");
 
+/** Three four-point stars, drawn in the accent colour, marking the sentence that states the finding. */
+function InsightIcon() {
+  const star = (cx: number, cy: number, r: number) =>
+    `M${cx} ${cy - r} Q${cx} ${cy} ${cx + r} ${cy} Q${cx} ${cy} ${cx} ${cy + r} Q${cx} ${cy} ${cx - r} ${cy} Q${cx} ${cy} ${cx} ${cy - r} Z`;
+  return (
+    <svg className="result__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+      <path d={`${star(9.5, 14.5, 9)} ${star(19, 5.5, 4.5)} ${star(19.5, 15.5, 2.5)}`} fill="currentColor" />
+    </svg>
+  );
+}
+
 /** One sentence that holds whether or not anything is significant, and names the reason when nothing ran. */
 function headline(rows: CohortStat[], alpha: number): ReactNode {
   const ok = rows.filter((r) => r.status === "ok" && r.effect_size !== null && r.p_adj !== null);
@@ -41,11 +52,12 @@ function headline(rows: CohortStat[], alpha: number): ReactNode {
   const hits = ok.filter((r) => r.significant === 1).sort((a, b) => Math.abs(b.effect_size!) - Math.abs(a.effect_size!));
   return (
     <>
-      At {dayLabel(earliest).toLowerCase()}, the largest difference between responders and non-responders is{" "}
+      At <strong>{dayLabel(earliest).toLowerCase()}</strong>, the largest difference between responders and non-responders is{" "}
       <strong>{populationLabel(top)}</strong> ({direction(top.effect_size!)} in responders, Cliff's delta {formatDelta(top.effect_size!)}, adjusted p {formatP(top.p_adj!)}).{" "}
       {hits.length === 0
         ? <>No test in this cohort has an adjusted p below {alpha}.</>
-        : <>{hits.length === 1 ? "One test" : `${hits.length} tests`} in this cohort {hits.length === 1 ? "has" : "have"} an adjusted p below {alpha}: {hits.map((r) => `${populationLabel(r)} at ${dayLabel(r.time_from_treatment_start).toLowerCase()}`).join(", ")}.</>}
+        : <>{hits.length === 1 ? "One test" : `${hits.length} tests`} in this cohort {hits.length === 1 ? "has" : "have"} an adjusted p below {alpha}:{" "}
+          {hits.map((r, i) => <span key={`${r.population}-${r.time_from_treatment_start}`}>{i > 0 && ", "}<strong>{populationLabel(r)}</strong> at <strong>{dayLabel(r.time_from_treatment_start).toLowerCase()}</strong></span>)}.</>}
     </>
   );
 }
@@ -296,7 +308,7 @@ export function CohortPage() {
               </div>
             ) : (
               <>
-                <p className="result">{headline(rows, alpha)}</p>
+                <p className="result"><InsightIcon /><span>{headline(rows, alpha)}</span></p>
                 {wideCohort && (
                   <p className="note">
                     Individual points are hidden for cohorts with more than 3,000 samples; boxes and whiskers show the distribution.
