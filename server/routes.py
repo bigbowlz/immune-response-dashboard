@@ -69,7 +69,7 @@ def frequencies(
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> dict:
-    """Part 2 summary table, one page at a time. Sorting and searching happen in SQL."""
+    """Cell frequency table, one page at a time. Sorting and searching happen in SQL."""
     where, order, params = _frequencies_sql(search, sort, dir)
     total = conn.execute(f"SELECT COUNT(*) FROM sample_summary{where}", params).fetchone()[0]
     rows = conn.execute(
@@ -81,7 +81,7 @@ def frequencies(
 
 @router.get("/frequencies.csv")
 def frequencies_csv(conn: Conn, search: Search = None, sort: SortColumn = "sample", dir: SortDir = "asc") -> StreamingResponse:
-    """Every matching row of the Part 2 table as CSV, in the same order the table shows."""
+    """Every matching row of the cell frequency table as CSV, in the same order the table shows."""
     where, order, params = _frequencies_sql(search, sort, dir)
     # Materialise before returning: the connection dependency closes when the handler returns,
     # so the generator must not touch the cursor. 52,500 tuples is a few MB, fine.

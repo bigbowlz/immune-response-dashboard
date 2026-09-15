@@ -8,7 +8,7 @@ Live dashboard: https://immune-response-dashboard.vercel.app (the same app that 
 
 ## What it shows
 
-The dashboard has two pages. Cohort analysis lets you pick a cohort with five filters and then shows what is in it: the composition, a one-line finding, a boxplot per population of cell frequency by day split by response, the statistics behind each panel, and the matching samples. Cell frequencies is the Part 2 table, one row per population per sample, with search, sorting, paging and a CSV export.
+The dashboard has two pages. Cohort analysis lets you pick a cohort with five filters and then shows what is in it: the composition, a one-line finding, a boxplot per population of cell frequency by day split by response, the statistics behind each panel, and the matching samples. Cell frequencies is the summary table, one row per population per sample, with search, sorting, paging and a CSV export.
 
 The default cohort is melanoma patients on miraclib, PBMC samples, all projects and all timepoints: 1,968 samples from 656 subjects. In that cohort no population separates responders from non-responders once the p-values are corrected for multiple comparisons. The two largest differences, B cells lower in responders at day 14 (adjusted p 0.216) and CD4 T cells higher at day 7 (0.223), fall well short of significance.
 
@@ -95,7 +95,7 @@ The database has three raw tables and five result tables, all declared in `analy
 | `population` | TEXT    | PK                        | b_cell, cd8_t_cell, cd4_t_cell, nk_cell or monocyte  |
 | `count`      | INTEGER |                           | raw cell count, checked ≥ 0                          |
 
-`sample_summary`: one row per sample per population (the Part 2 table)
+`sample_summary`: one row per sample per population (the Cell frequencies table)
 
 | Column        | Type    | Key                       | Meaning                                           |
 | ------------- | ------- | ------------------------- | ------------------------------------------------- |

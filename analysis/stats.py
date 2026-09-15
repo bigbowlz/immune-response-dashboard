@@ -21,7 +21,7 @@ CELL_COLUMNS = [
 
 
 def compute_sample_summary(cell_counts: pd.DataFrame) -> pd.DataFrame:
-    """Part 2: one row per sample per population with the count as a percentage of the sample total."""
+    """One row per sample per population with the count as a percentage of the sample total."""
     frame = cell_counts[["sample", "population", "count"]].copy()
     frame["total_count"] = frame.groupby("sample")["count"].transform("sum")
     zero_total = frame.loc[frame["total_count"] <= 0, "sample"].unique()
