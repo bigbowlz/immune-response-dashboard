@@ -234,30 +234,3 @@ def cohort_samples(
     total = cohort.count_samples(conn, filters.filters)
     rows = cohort.list_samples(conn, filters.filters, sort=sort, direction=dir, limit=limit, offset=offset)
     return {"rows": rows, "total": total, "limit": limit, "offset": offset}
-
-
-@router.get("/cohort/samples.csv")
-def cohort_samples_csv(conn: Conn, filters: Filters, sort: SampleSortColumn = "sample", dir: SortDir = "asc") -> StreamingResponse:
-    """Every matching sample as CSV, in the same order the table shows."""
-    total = cohort.count_samples(conn, filters.filters)
-    # `list_samples` already materialises its rows (fetchall) before returning, so this happens
-    # before the StreamingResponse below is built and the connection dependency closes.
-    rows = cohort.list_samples(conn, filters.filters, sort=sort, direction=dir, limit=max(total, 1), offset=0)
-    tuples = [tuple(r[column] for column in cohort.SAMPLE_COLUMNS) for r in rows]
-
-    def generate():
-        buffer = io.StringIO()
-        writer = csv.writer(buffer)
-        writer.writerow(cohort.SAMPLE_COLUMNS)
-        yield buffer.getvalue()
-        for start in range(0, len(tuples), 2000):
-            buffer.seek(0)
-            buffer.truncate()
-            writer.writerows(tuples[start:start + 2000])
-            yield buffer.getvalue()
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/csv",
-        headers={"Content-Disposition": 'attachment; filename="samples.csv"'},
-    )

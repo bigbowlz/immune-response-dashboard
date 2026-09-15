@@ -25,7 +25,7 @@ Five filters define the cohort, each taking `all` or one value from the data:
 | Project     | all, prj1, prj2, prj3             | all      |
 | Timepoints  | all, 0, 7, 14                     | all      |
 
-"Baseline only" sets timepoints to day 0 and leaves the other four alone; "Reset to default cohort" restores all five defaults. A cohort is the selected group of samples and their subjects, never an individual subject or sample. Below the charts and the statistics table, "Matching samples" lists every sample in the cohort — sample, subject, project, condition, treatment, sample type, timepoint, response and sex — with sorting and paging, and "Export CSV" downloads every matching row, not just the page on screen.
+The "Baseline only" switch sets timepoints to day 0 and leaves the other four alone; the "Default cohort" switch restores all five defaults. A cohort is the selected group of samples and their subjects, never an individual subject or sample. Below the charts and the statistics table, "Matching samples" lists every sample in the cohort — sample, subject, project, condition, treatment, sample type, timepoint, response and sex — with sorting and paging.
 
 With every filter widened to "all" the cohort is the whole dataset: 10,500 samples from 3,500 subjects, 1,422 of them without a recorded response. Those are the samples of the 474 untreated healthy subjects; the page counts them and says how many there are instead of putting them in the comparison.
 
@@ -84,7 +84,6 @@ Tests: `.venv/bin/python -m pytest`. Interactive API docs: `http://localhost:800
 | `/api/cohort/stats?…`                                | The cohort's `response_stats` rows including unavailable ones, the correction `family` they belong to, and `n_tests`                      |
 | `/api/cohort/points?…`                               | Per-sample percentages behind the boxplots, for the samples with a recorded response                                                      |
 | `/api/cohort/samples?…&sort=&dir=&limit=&offset=`    | One page of the matching samples (`limit` 1–500, default 50; `offset` default 0)                                                          |
-| `/api/cohort/samples.csv?…&sort=&dir=`               | Every matching sample as CSV, streamed                                                                                                    |
 
 Each cohort endpoint takes the same five filters as query parameters — `condition`, `treatment`, `sample_type`, `project`, `time_from_treatment_start` — each `all` or one value from the data. An omitted parameter falls back to the default listed above; an unknown value is a 422.
 

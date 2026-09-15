@@ -40,5 +40,3 @@ export const getCohortStats = (f: CohortFilters, signal?: AbortSignal) => getJso
 export const getCohortPoints = (f: CohortFilters, signal?: AbortSignal) => getJson<CohortPointsResponse>(`/api/cohort/points${query(f)}`, signal);
 export const getCohortSamples = (f: CohortFilters, page: SamplePage, signal?: AbortSignal) =>
   getJson<SamplesResponse>(`/api/cohort/samples${query({ ...f, ...page })}`, signal);
-export const cohortSamplesCsvUrl = (f: CohortFilters, sort: SampleColumn, dir: SortDir) =>
-  `/api/cohort/samples.csv${query({ ...f, sort, dir })}`;

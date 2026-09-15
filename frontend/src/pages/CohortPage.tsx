@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { cohortSamplesCsvUrl, getCohortOptions, getCohortPoints, getCohortSamples, getCohortStats, getCohortSummary } from "../api";
+import { getCohortOptions, getCohortPoints, getCohortSamples, getCohortStats, getCohortSummary } from "../api";
 import { PopulationBoxplot, dayLabel, formatDelta, formatP } from "../charts/PopulationBoxplot";
 import { BreakdownCard } from "../components/BreakdownCard";
 import { Card } from "../components/Card";
@@ -216,7 +216,7 @@ export function CohortPage() {
   // Defined once: the samples list is also worth showing when the rest of the cohort fetch failed but a
   // newer samples request had already delivered rows for these filters.
   const samplesCard = (
-    <Card title="Matching samples" subtitle="Every sample in the selected cohort. Sorting, paging and the export cover all matching rows, not just the page shown.">
+    <Card title="Matching samples">
       {/* The failed card above already shows the page-level error once; do not repeat it here. */}
       {!failed && error && <p className="error">{error}</p>}
       <DataTable
@@ -232,7 +232,6 @@ export function CohortPage() {
         loading={samplesLoading}
         emptyText="No samples match these filters."
         rowKey={(row) => row.sample}
-        toolbar={<a className="button" href={cohortSamplesCsvUrl(filters, table.sort, table.dir)} download>Export CSV</a>}
       />
     </Card>
   );

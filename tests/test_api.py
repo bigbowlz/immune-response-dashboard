@@ -61,18 +61,6 @@ def test_frequencies_search_sort_and_paging(client):
     assert last["population"] == "monocyte"
 
 
-def test_frequencies_csv(client):
-    response = client.get("/api/frequencies.csv")
-    assert response.status_code == 200
-    assert response.headers["content-type"].startswith("text/csv")
-    lines = response.text.strip().splitlines()
-    assert lines[0] == "sample,total_count,population,count,percentage"
-    assert len(lines) == 52501
-    sorted_csv = client.get("/api/frequencies.csv", params={"search": "sample00000", "sort": "count", "dir": "desc"}).text.strip().splitlines()
-    counts = [int(line.split(",")[3]) for line in sorted_csv[1:]]
-    assert counts == sorted(counts, reverse=True) and len(counts) == 5
-
-
 def test_cohort_options(client):
     body = client.get("/api/cohort/options").json()
     assert body["condition"] == ["carcinoma", "healthy", "melanoma"]
@@ -178,25 +166,6 @@ def test_cohort_samples_paging_and_sort(client):
     assert client.get("/api/cohort/samples", params={"limit": 0}).status_code == 422
     assert client.get("/api/cohort/samples", params={"limit": 501}).status_code == 422
     assert client.get("/api/cohort/samples", params={"offset": -1}).status_code == 422
-
-
-def test_cohort_samples_csv(client):
-    response = client.get("/api/cohort/samples.csv", params={"time_from_treatment_start": "0"})
-    assert response.status_code == 200
-    assert response.headers["content-type"].startswith("text/csv")
-    assert response.headers["content-disposition"] == 'attachment; filename="samples.csv"'
-    lines = response.text.strip().splitlines()
-    assert lines[0] == "sample,subject,project,condition,treatment,sample_type,time_from_treatment_start,response,sex"
-    assert len(lines) == 657
-
-
-def test_cohort_samples_null_response_serializes_as_empty_csv_and_null_json(client):
-    params = {"condition": "healthy", "treatment": "none"}
-    json_body = client.get("/api/cohort/samples", params={**params, "limit": 1}).json()
-    assert json_body["rows"][0]["response"] is None
-    csv_text = client.get("/api/cohort/samples.csv", params=params).text
-    first_row = csv_text.strip().splitlines()[1].split(",")
-    assert first_row[7] == ""  # response column, per SAMPLE_COLUMNS order
 
 
 def test_cohort_filters_reject_unknown_values(client):
