@@ -100,10 +100,10 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
 
 /* Cohort filter card: a plain-text crumb line above outlined selects whose label sits on the top border. */
 .filter-card { display: flex; flex-direction: column; gap: 18px; }
-.crumbs { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; font-size: 13px; }
+.crumbs { display: flex; flex-wrap: wrap; gap: 6px 0; margin: 0; font-size: 13px; }
 .crumb__label { color: var(--muted); }
 .crumb__value { color: var(--accent); font-weight: 600; }
-.crumb__sep { color: var(--muted); margin: 0 8px; }
+.crumb__sep { color: var(--muted); margin: 0 14px; }
 .fields { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 /* A fieldset draws the box and its legend sits in the border natively, so the label never paints over anything. */
 .field { box-sizing: border-box; width: 184px; flex: none; margin: 0; padding: 0 8px 6px; border: 1px solid var(--line); border-radius: var(--radius-control); background: #fff; }
