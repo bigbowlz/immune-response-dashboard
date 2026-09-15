@@ -186,10 +186,14 @@ export function CohortPage() {
     return () => controller.abort();
   }, [filters, table]);
 
+  // "Default cohort" is an explicit switch: on resets every selector, off leaves them as they are, and any
+  // selector change switches it off. It never switches itself on.
+  const [defaultOn, setDefaultOn] = useState(true);
   const applyFilters = (next: CohortFilters) => {
     samplesHandled.current = true;
     setTable(DEFAULT_TABLE);
     setFilters(next);
+    if ((Object.keys(DEFAULT_FILTERS) as Array<keyof CohortFilters>).some((k) => next[k] !== filters[k])) setDefaultOn(false);
   };
 
   const rows = stats?.rows ?? [];
@@ -243,9 +247,9 @@ export function CohortPage() {
         filters={filters}
         options={options}
         onChange={applyFilters}
-        isDefault={(Object.keys(DEFAULT_FILTERS) as Array<keyof CohortFilters>).every((k) => filters[k] === DEFAULT_FILTERS[k])}
+        defaultOn={defaultOn}
         onBaseline={(on) => applyFilters({ ...filters, time_from_treatment_start: on ? "0" : "all" })}
-        onReset={() => applyFilters(DEFAULT_FILTERS)}
+        onDefault={(on) => { if (on) { applyFilters(DEFAULT_FILTERS); setDefaultOn(true); } else setDefaultOn(false); }}
       />
 
       {failed ? (

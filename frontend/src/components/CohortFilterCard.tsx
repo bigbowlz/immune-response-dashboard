@@ -16,6 +16,9 @@ export const FILTER_LABELS: Record<CohortFilterKey, string> = {
 /** The order of the selects; the crumb line follows the same order. */
 const FILTER_ORDER: CohortFilterKey[] = ["condition", "treatment", "sample_type", "time_from_treatment_start", "project"];
 
+const BASELINE_TIP = "Keeps only day 0 samples, taken before treatment. Switching it off restores all timepoints.";
+const DEFAULT_TIP = "Melanoma, miraclib, PBMC, all timepoints, all projects. Switching it on resets every selector; it switches off when any selector changes.";
+
 const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** Display form of one filter value. Sample types and project ids keep the spelling the data uses. */
@@ -30,12 +33,12 @@ interface Props {
   filters: CohortFilters;
   options: CohortOptions | null;
   onChange: (next: CohortFilters) => void;
-  isDefault: boolean;
+  defaultOn: boolean;
   onBaseline: (on: boolean) => void;
-  onReset: () => void;
+  onDefault: (on: boolean) => void;
 }
 
-export function CohortFilterCard({ filters, options, onChange, isDefault, onBaseline, onReset }: Props) {
+export function CohortFilterCard({ filters, options, onChange, defaultOn, onBaseline, onDefault }: Props) {
   const id = useId();
   return (
     <Card>
@@ -64,8 +67,14 @@ export function CohortFilterCard({ filters, options, onChange, isDefault, onBase
             </fieldset>
           ))}
           <div className="toggles">
-            <Toggle label="Baseline only" checked={filters.time_from_treatment_start === "0"} disabled={!options} onChange={onBaseline} />
-            <Toggle label="Default cohort" checked={isDefault} disabled={!options} onChange={(on) => { if (on) onReset(); }} />
+            <div className="toggle-row">
+              <Toggle label="Baseline only" checked={filters.time_from_treatment_start === "0"} disabled={!options} onChange={onBaseline} />
+              <button type="button" className="help" aria-label={BASELINE_TIP} data-tip={BASELINE_TIP}>?</button>
+            </div>
+            <div className="toggle-row">
+              <Toggle label="Default cohort" checked={defaultOn} disabled={!options} onChange={onDefault} />
+              <button type="button" className="help" aria-label={DEFAULT_TIP} data-tip={DEFAULT_TIP}>?</button>
+            </div>
           </div>
         </div>
       </div>

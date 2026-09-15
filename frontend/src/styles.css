@@ -135,6 +135,7 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
 .select__option[aria-selected="true"] { font-weight: 600; }
 .select__option--active { background: var(--accent-bg); }
 .toggles { display: flex; flex-direction: column; gap: 6px; justify-content: center; margin-left: 12px; align-self: stretch; }
+.toggle-row { display: flex; align-items: center; gap: 8px; }
 /* Switches: a native checkbox drawn as a track and thumb, accent when on. */
 .toggle { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
 .toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
