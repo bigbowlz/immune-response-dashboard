@@ -45,7 +45,7 @@ a { color: inherit; }
 .help::after { content: attr(data-tip); position: absolute; left: calc(100% + 8px); top: 50%; transform: translateY(-50%); white-space: nowrap; padding: 6px 10px; border-radius: var(--radius-control); background: var(--text); color: #fff; font-size: 12px; font-weight: 400; line-height: 1.3; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: opacity 120ms ease-out; z-index: 30; }
 .help:hover::after, .help:focus-visible::after { opacity: 1; }
 .help--left::after { left: auto; right: calc(100% + 8px); }
-.help--small { width: 18px; height: 18px; line-height: 16px; font-size: 11px; margin-left: 6px; vertical-align: middle; }
+.help--small { width: 18px; height: 18px; line-height: 16px; font-size: 11px; flex: none; }
 .help--down::after { top: calc(100% + 6px); left: auto; right: 0; transform: none; }
 /* Statistics table: centred column names, right-aligned values. */
 .stats table.data th, .stats table.data th.num { text-align: center; }
@@ -94,6 +94,8 @@ table.data th, table.data td { text-align: left; padding: 8px 10px; border-botto
 table.data th { color: var(--muted); font-weight: 600; }
 table.data th.sorted { color: var(--text); }
 table.data td.num, table.data th.num { text-align: right; font-variant-numeric: tabular-nums; }
+/* Column label and its help icon share one centred row, so the icon sits level with the text. */
+.th-content { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }
 .th-sort { all: unset; cursor: pointer; font: inherit; color: inherit; display: inline-flex; gap: 4px; align-items: center; min-height: 32px; }
 .th-sort:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .th-sort[disabled] { cursor: default; }

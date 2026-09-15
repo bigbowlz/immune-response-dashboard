@@ -87,10 +87,12 @@ export function DataTable<T extends object>(props: Props<T>) {
                     className={`${c.numeric ? "num " : ""}${active ? "sorted" : ""}`}
                     aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
                   >
-                    <button type="button" className="th-sort" onClick={() => toggleSort(c.key)} disabled={loading} aria-label={`Sort by ${c.label}`}>
-                      {c.label}{active ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
-                    </button>
-                    {c.help && <button type="button" className="help help--small help--down" aria-label={c.help} data-tip={c.help}>?</button>}
+                    <span className="th-content">
+                      <button type="button" className="th-sort" onClick={() => toggleSort(c.key)} disabled={loading} aria-label={`Sort by ${c.label}`}>
+                        {c.label}{active ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+                      </button>
+                      {c.help && <button type="button" className="help help--small help--down" aria-label={c.help} data-tip={c.help}>?</button>}
+                    </span>
                   </th>
                 );
               })}
