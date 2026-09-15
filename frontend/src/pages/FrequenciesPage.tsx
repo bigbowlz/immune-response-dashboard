@@ -48,6 +48,7 @@ export function FrequenciesPage() {
       <PageHeader title="Cell frequencies" subtitle="Relative frequency of each immune cell population in every sample, as a percentage of the sample's total cell count." />
       <Card title="Population summary" subtitle="One row per population per sample. percentage = count / total_count x 100. Sorting, search and export cover all rows, not just the page shown.">
         {error && <p className="error">{error}</p>}
+        <div className="frequencies">
         <DataTable
           columns={COLUMNS}
           rows={rows}
@@ -68,6 +69,7 @@ export function FrequenciesPage() {
             </>
           }
         />
+        </div>
       </Card>
     </>
   );

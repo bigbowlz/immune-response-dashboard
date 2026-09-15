@@ -131,3 +131,8 @@ table.data td .sig { color: var(--accent); font-weight: 600; }
 .refreshable--busy { opacity: 0.6; }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } .refreshable { transition: none; } }
 
+
+/* Cell frequencies: five equal, left-aligned columns; the sample search box shows its whole hint. */
+.frequencies table.data { table-layout: fixed; }
+.frequencies table.data th, .frequencies table.data td { width: 20%; text-align: left; }
+.toolbar input[type="search"] { width: 300px; max-width: 100%; }
