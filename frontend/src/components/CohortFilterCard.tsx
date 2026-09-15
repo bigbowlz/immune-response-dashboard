@@ -69,11 +69,11 @@ export function CohortFilterCard({ filters, options, onChange, defaultOn, onBase
           <div className="toggles">
             <div className="toggle-row">
               <Toggle label="Baseline only" checked={filters.time_from_treatment_start === "0"} disabled={!options} onChange={onBaseline} />
-              <button type="button" className="help" aria-label={BASELINE_TIP} data-tip={BASELINE_TIP}>?</button>
+              <button type="button" className="help help--left" aria-label={BASELINE_TIP} data-tip={BASELINE_TIP}>?</button>
             </div>
             <div className="toggle-row">
               <Toggle label="Default cohort" checked={defaultOn} disabled={!options} onChange={onDefault} />
-              <button type="button" className="help" aria-label={DEFAULT_TIP} data-tip={DEFAULT_TIP}>?</button>
+              <button type="button" className="help help--left" aria-label={DEFAULT_TIP} data-tip={DEFAULT_TIP}>?</button>
             </div>
           </div>
         </div>
