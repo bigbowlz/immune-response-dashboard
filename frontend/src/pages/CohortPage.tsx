@@ -219,6 +219,7 @@ export function CohortPage() {
     <Card title="Matching samples">
       {/* The failed card above already shows the page-level error once; do not repeat it here. */}
       {!failed && error && <p className="error">{error}</p>}
+      <div className="samples">
       <DataTable
         columns={SAMPLE_COLUMNS}
         rows={samples}
@@ -233,6 +234,7 @@ export function CohortPage() {
         emptyText="No samples match these filters."
         rowKey={(row) => row.sample}
       />
+      </div>
     </Card>
   );
 

@@ -178,3 +178,8 @@ table.data td .sig { color: var(--accent); font-weight: 600; }
 .frequencies table.data { table-layout: fixed; }
 .frequencies table.data th, .frequencies table.data td { width: 20%; text-align: left; }
 .toolbar input[type="search"] { width: 300px; max-width: 100%; }
+/* Matching samples: nine equal, left-aligned columns. */
+.samples table.data { table-layout: fixed; min-width: 920px; } /* scrolls inside the card below ~1250px rather than squeezing the IDs */
+.samples table.data th, .samples table.data td, .samples table.data th.num, .samples table.data td.num { width: auto; text-align: left; }
+.samples table.data th { white-space: normal; vertical-align: bottom; }
+.samples .th-sort { display: inline; line-height: 1.3; }
