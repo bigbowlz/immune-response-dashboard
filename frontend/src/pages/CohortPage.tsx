@@ -305,7 +305,6 @@ export function CohortPage() {
 
           <Card
             title="Population frequencies by response"
-            subtitle="Boxes: non-responder (blue, circles) and responder (green, diamonds) at each selected timepoint; points are individual samples; the adjusted p for each test sits under its day."
           >
             {loading || !stats ? (
               <div className="charts">
@@ -345,7 +344,7 @@ export function CohortPage() {
                   })}
                 </div>
                 <p className="note" style={{ marginTop: 12 }}>
-                  {description}. Percent of total means count divided by the sum of the five population counts.{" "}
+                  {description}. Cell frequency is the population count divided by the sum of the five population counts, as a percentage.{" "}
                   {summary && (summary.n_missing_response > 0
                     ? `${summary.n_missing_response.toLocaleString()} of ${summary.n_samples.toLocaleString()} matching samples are excluded from the comparison because no response is recorded for their subject.`
                     : "No matching sample is excluded: every subject in this cohort has a recorded response.")}

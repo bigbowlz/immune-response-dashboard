@@ -104,7 +104,7 @@ export function PopulationBoxplot({ population, points, stats, timepoints, alpha
     plot_bgcolor: "#ffffff",
     font: { family: "Inter, system-ui, sans-serif", size: 12, color: TEXT },
     xaxis: { type: "category", categoryorder: "array", categoryarray: categories, showgrid: false, tickfont: { size: 12 } },
-    yaxis: { title: { text: "Percent of total" }, gridcolor: "#eef0f3", zeroline: false, rangemode: "tozero", range: sharedYMax ? [0, sharedYMax] : undefined },
+    yaxis: { title: { text: "Cell frequency (%)" }, gridcolor: "#eef0f3", zeroline: false, rangemode: "tozero", range: sharedYMax ? [0, sharedYMax] : undefined },
     legend: { orientation: "h", y: -0.4, x: 0.5, xanchor: "center" },
     annotations,
     showlegend: true,
