@@ -48,21 +48,27 @@ export function CohortFilterCard({ filters, options, onChange, onBaseline, onRes
         </p>
         <div className="fields">
           {FILTER_ORDER.map((key) => (
-            <div className="field" key={key}>
-              <label className="field__label" htmlFor={`${id}-${key}`}>{FILTER_LABELS[key]}</label>
-              <select
-                id={`${id}-${key}`}
-                aria-label={FILTER_LABELS[key]}
-                value={filters[key]}
-                disabled={!options}
-                onChange={(e) => onChange({ ...filters, [key]: e.target.value })}
-              >
-                <option value="all">All</option>
-                {(options?.[key] ?? []).map((v) => (
-                  <option key={String(v)} value={String(v)}>{filterValueLabel(key, String(v))}</option>
-                ))}
-              </select>
-            </div>
+            <fieldset className="field" key={key}>
+              <legend className="field__label">{FILTER_LABELS[key]}</legend>
+              {options ? (
+                <select
+                  id={`${id}-${key}`}
+                  aria-label={FILTER_LABELS[key]}
+                  value={filters[key]}
+                  onChange={(e) => onChange({ ...filters, [key]: e.target.value })}
+                >
+                  <option value="all">All</option>
+                  {options[key].map((v) => (
+                    <option key={String(v)} value={String(v)}>{filterValueLabel(key, String(v))}</option>
+                  ))}
+                </select>
+              ) : (
+                // Blank until the option lists arrive, so the control never shows a value that is about to change.
+                <select id={`${id}-${key}`} aria-label={FILTER_LABELS[key]} value="" disabled onChange={() => undefined}>
+                  <option value="" />
+                </select>
+              )}
+            </fieldset>
           ))}
           <div className="field-actions">
             <button type="button" className="button" onClick={onBaseline} disabled={filters.time_from_treatment_start === "0"}>Baseline only</button>

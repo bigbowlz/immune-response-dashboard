@@ -13,6 +13,9 @@ import {
   type CohortSummary, type Population, type SampleColumn, type SampleRow,
 } from "../types";
 
+// The option lists never change for a given database; keep them across page switches so the selects never render empty twice.
+let optionsCache: CohortOptions | null = null;
+
 const DEFAULT_FILTERS: CohortFilters = {
   condition: "melanoma", treatment: "miraclib", sample_type: "PBMC", project: "all", time_from_treatment_start: "all",
 };
@@ -104,7 +107,7 @@ const SAMPLE_COLUMNS: ColumnDef<SampleRow>[] = [
 ];
 
 export function CohortPage() {
-  const [options, setOptions] = useState<CohortOptions | null>(null);
+  const [options, setOptions] = useState<CohortOptions | null>(optionsCache);
   const [filters, setFilters] = useState<CohortFilters>(DEFAULT_FILTERS);
 
   const [summary, setSummary] = useState<CohortSummary | null>(null);
@@ -156,7 +159,8 @@ export function CohortPage() {
   };
 
   useEffect(() => {
-    getCohortOptions().then(setOptions).catch((e: Error) => setError(e.message));
+    if (optionsCache) return;
+    getCohortOptions().then((o) => { optionsCache = o; setOptions(o); }).catch((e: Error) => setError(e.message));
   }, []);
 
   // One controller per filter change covering summary, stats, points and the first samples page:
