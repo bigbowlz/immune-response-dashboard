@@ -24,12 +24,6 @@ Five filters define the cohort. Each takes `all` or one value from the data:
 | Project     | all, prj1, prj2, prj3             | all      |
 | Timepoints  | all, 0, 7, 14                     | all      |
 
-The Baseline only switch sets timepoints to day 0 and leaves the other four filters as they are. The Default cohort switch puts all five back to their defaults. Throughout this README a cohort means the group of samples the filters select, together with their subjects.
-
-Above the charts, a single sentence names the population with the largest responder difference at the earliest selected day, says whether any test in the cohort came out significant, and gives the number of tests the adjusted p-values are corrected for. Hover a point in a boxplot to see that sample's count, population, sample and subject ids and response. Hover a box to see its maximum, upper fence, quartiles, median, lower fence and minimum. The U, BH-adjusted p, Cliff's delta and Significance columns of the statistics table each have a tooltip that explains them. The Matching samples table at the bottom lists every sample in the cohort with its subject, project, condition, treatment, sample type, timepoint, response and sex. It can be sorted and paged.
-
-With every filter set to `all` the cohort is the whole dataset: 10,500 samples from 3,500 subjects. 1,422 of those samples have no recorded response. They belong to the 474 healthy subjects, who were not treated. The page counts them and says how many there are rather than putting them into the comparison.
-
 ## Run it
 
 Prerequisites: Python 3.12+, Node 20+ with npm, make.
