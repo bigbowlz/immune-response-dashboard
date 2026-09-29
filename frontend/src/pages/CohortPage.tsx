@@ -44,21 +44,40 @@ function headline(rows: CohortStat[], alpha: number): ReactNode {
     const reason = rows.find((r) => r.reason)?.reason ?? "no comparable samples";
     return <>No response comparison is available for this cohort: {reason}.</>;
   }
-  const earliest = Math.min(...ok.map((r) => r.time_from_treatment_start));
-  const ranked = ok
-    .filter((r) => r.time_from_treatment_start === earliest)
-    .sort((a, b) => Math.abs(b.effect_size!) - Math.abs(a.effect_size!));
-  const top = ranked[0];
-  const hits = ok.filter((r) => r.significant === 1).sort((a, b) => Math.abs(b.effect_size!) - Math.abs(a.effect_size!));
+  // Ranked across every selected day by effect size, not by p: the headline names what differs most and the
+  // p beside it says how sure that is. Every significant cell is listed after it, so the ranking cannot hide one.
+  const byEffect = (a: CohortStat, b: CohortStat) => Math.abs(b.effect_size!) - Math.abs(a.effect_size!);
+  const same = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+  // Every cell at the largest effect is named, so a tie is never settled by row order.
+  const largest = Math.max(...ok.map((r) => Math.abs(r.effect_size!)));
+  const tops = ok.filter((r) => same(Math.abs(r.effect_size!), largest));
+  // Benjamini-Hochberg often gives several tests one adjusted p. Say so, or the p beside the name reads as
+  // if it singled that test out when the raw p and the effect size are what separate it.
+  const sharing = ok.filter((r) => same(r.p_adj!, tops[0].p_adj!));
+  const others = tops.every((r) => same(r.p_adj!, tops[0].p_adj!)) ? sharing.length - tops.length : 0;
+  const hits = ok.filter((r) => r.significant === 1).sort(byEffect);
+  // The correction family is exactly the testable cells on screen; say which days they span.
+  const days = [...new Set(ok.map((r) => r.time_from_treatment_start))].sort((a, b) => a - b);
+  const dayList = days.length === 1 ? `at ${dayLabel(days[0]).toLowerCase()}` : `at each of days ${days.slice(0, -1).join(", ")} and ${days[days.length - 1]}`;
   return (
     <>
-      At <strong>{dayLabel(earliest).toLowerCase()}</strong>, the largest difference between responders and non-responders is{" "}
-      <strong>{populationLabel(top)}</strong> ({direction(top.effect_size!)} in responders, Cliff's delta {formatDelta(top.effect_size!)}, adjusted p {formatP(top.p_adj!)}).{" "}
+      {tops.length === 1 ? "The largest difference between responders and non-responders is" : "The largest differences between responders and non-responders are"}{" "}
+      {tops.map((r, i) => (
+        <span key={`${r.population}-${r.time_from_treatment_start}`}>
+          {i > 0 && (i === tops.length - 1 ? " and " : ", ")}
+          <strong>{populationLabel(r)}</strong> at <strong>{dayLabel(r.time_from_treatment_start).toLowerCase()}</strong>
+          {i === 0 ? ", based on Cliff's delta " : " "}
+          ({formatDelta(r.effect_size!)}, {direction(r.effect_size!)} in responders, raw p {formatP(r.p_raw!)}, adjusted p {formatP(r.p_adj!)})
+        </span>
+      ))}.{" "}
+      {others > 0 && (sharing.length === ok.length
+        ? <>After correction all <strong>{ok.length.toLocaleString()}</strong> tests share that adjusted p{hits.length === 0 && ", so none stands out"}.{" "}</>
+        : <>That adjusted p is shared with {others.toLocaleString()} other {others === 1 ? "test" : "tests"}.{" "}</>)}
       {hits.length === 0
         ? <>No test in this cohort has an adjusted p below {alpha}.</>
         : <>{hits.length === 1 ? "One test" : `${hits.length} tests`} in this cohort {hits.length === 1 ? "has" : "have"} an adjusted p below {alpha}:{" "}
           {hits.map((r, i) => <span key={`${r.population}-${r.time_from_treatment_start}`}>{i > 0 && ", "}<strong>{populationLabel(r)}</strong> at <strong>{dayLabel(r.time_from_treatment_start).toLowerCase()}</strong></span>)}.</>}{" "}
-      Adjusted p-values are corrected for the <strong>{ok.length.toLocaleString()}</strong> {ok.length === 1 ? "test" : "tests"} run in this cohort, one per population at each selected day.
+      Adjusted p-values are corrected for the <strong>{ok.length.toLocaleString()}</strong> {ok.length === 1 ? "test" : "tests"} shown, one per population {dayList}.
     </>
   );
 }
